@@ -1,29 +1,58 @@
-/.phpunit.cache
-/bootstrap/ssr
-/node_modules
-/public/build
-/public/fonts-manifest.dev.json
-/public/hot
-/public/storage
+# Laravel & Composer
+/vendor/
+/bootstrap/cache/*.php
 /storage/*.key
 /storage/pail
-/resources/js/actions
-/resources/js/routes
-/resources/js/wayfinder
-/vendor
-.DS_Store
+/public/build
+/public/hot
+/public/storage
+/node_modules/
+
+# Entorno
 .env
-.env.backup
-.env.production
-.phpactor.json
+.env.*
+!.env.example
+auth.json
+
+# Testing, y  Caches
 .phpunit.result.cache
-Homestead.json
-Homestead.yaml
-npm-debug.log
-yarn-error.log
-/auth.json
-/.fleet
+.phpunit.cache/
+.pest/
+.phpstan.result.cache
+.php-cs-fixer.cache
+.pint.cache
+coverage/
+
+# Base de datos locales
+/database/*.sqlite
+/database/*.sqlite-journal
+/database/*.sqlite-shm
+/database/*.sqlite-wal
+
+# ESP32 / IoT Firmware
+/iot-esp32/.pio/
+/iot-esp32/.vscode/
+/iot-esp32/build/
+/iot-esp32/sdkconfig
+/iot-esp32/sdkconfig.old
+/iot-esp32/**/wifi_secrets.h
+/iot-esp32/**/secrets.h
+
+# Entornos de Agentes de IA
+.opencode/
+.antigravity/cache/
+.antigravity/logs/
+.antigravity/worktrees/
+.mcp.json
+
+# Archivos del IDE y del OS
 /.idea
-/.nova
 /.vscode
+/.fleet
+/.nova
 /.zed
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
