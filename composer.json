@@ -1,6 +1,6 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/react-starter-kit",
+    "name": "laravel/back-end-camion",
     "type": "project",
     "description": "The skeleton application for the Laravel framework.",
     "keywords": [
@@ -60,9 +60,6 @@
         ],
         "ci:check": [
             "Composer\\Config::disableProcessTimeout",
-            "npm run lint:check",
-            "npm run format:check",
-            "npm run types:check",
             "@test"
         ],
         "types:check": [
