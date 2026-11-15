@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
 /**
@@ -25,6 +26,22 @@ class AuditLog extends Model
     use HasFactory;
 
     const UPDATED_AT = null;
+
+    /**
+     * Registra un evento con la IP y el user agent de la petición.
+     *
+     * @param  array<string, mixed>  $detalles
+     */
+    public static function registrar(string $accion, ?User $user, Request $request, array $detalles = []): self
+    {
+        return self::create([
+            'user_id' => $user?->id,
+            'accion' => $accion,
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'detalles' => $detalles ?: null,
+        ]);
+    }
 
     /**
      * Get the attributes that should be cast.
