@@ -46,6 +46,35 @@ class Chofer extends Model
     }
 
     /**
+     * Valida el formato y el dígito verificador (módulo 11) de un RUT chileno.
+     */
+    public static function rutEsValido(string $rut): bool
+    {
+        if (! preg_match('/^\d{1,2}(\.?\d{3}){2}-?[\dkK]$/', trim($rut))) {
+            return false;
+        }
+
+        $normalizado = self::normalizarRut($rut);
+        $cuerpo = substr($normalizado, 0, -1);
+        $dv = substr($normalizado, -1);
+
+        $suma = 0;
+        $multiplicador = 2;
+        foreach (array_reverse(str_split($cuerpo)) as $digito) {
+            $suma += (int) $digito * $multiplicador;
+            $multiplicador = $multiplicador === 7 ? 2 : $multiplicador + 1;
+        }
+
+        $esperado = match (11 - ($suma % 11)) {
+            11 => '0',
+            10 => 'K',
+            default => (string) (11 - ($suma % 11)),
+        };
+
+        return $dv === $esperado;
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
