@@ -1,3 +1,83 @@
+# AGENTS.md — EcoRuta Temuco · API back-end (Laravel)
+
+Instrucciones para agentes de IA (Claude Code, OpenCode, Antigravity, etc.) que trabajen en este repositorio.
+La sección del proyecto (esta) manda sobre las guías genéricas de Laravel Boost que siguen más abajo.
+
+## 1. Contexto en 30 segundos
+
+- **Qué es:** API REST (`/api/v1`) de EcoRuta Temuco para Somos Terranova. Genera rutas de recolección según el llenado real de los puntos de reciclaje, rastrea la flota por GPS del teléfono del chofer y calcula KPI con metas.
+- **Clientes:** app Flutter (web para `administrador`, móvil para `chofer`) en el repo hermano `../logistica_camion_front_end`, y nodos sensores ESP32 (firmware en `iot-esp32/`, pendiente).
+- **Stack:** Laravel 13 · PHP 8.5 (Sail) · PostgreSQL (+ PostGIS, pendiente BE-01) · Sanctum (tokens Bearer) · Pest · Pint · Larastan.
+- **Plazo:** entrega final el 11-12-2026, con una demo del sistema funcionando. **Regla de oro: nada de datos simulados en la demo.**
+
+## 2. Fuentes de verdad (léelas antes de cambiar código)
+
+| Necesitas saber… | Lee |
+|---|---|
+| Qué hacer y en qué orden | `tasks/README.md` (índice general de BE, FE, IOT y DOC) |
+| Contrato de cada endpoint | `docs/API.md` |
+| Tablas, columnas y estados | `docs/DATA_MODEL.md` |
+| Componentes y flujos | `docs/ARCHITECTURE.md` |
+| Decisiones ya tomadas | `docs/ADR/` (solo las `Aceptada` son obligatorias) |
+| Controles de seguridad | `docs/SECURITY.md` |
+
+Si el código contradice la documentación, **el código manda** y la documentación se corrige en el mismo cambio.
+
+## 3. Flujo de trabajo para una tarea
+
+1. Elige **una** tarea de `tasks/` cuyas dependencias estén en estado `Hecha`. No mezcles tareas en un mismo cambio.
+2. Lee la tarea completa, los ADR que cita y las secciones de `docs/` relacionadas.
+3. Cambia el estado de la tarea a `En progreso`, también en la tabla de `tasks/README.md`.
+4. Implementa con pruebas Pest (feature tests con factories). Cada criterio de aceptación debe quedar cubierto por una prueba o por una verificación manual descrita en la tarea.
+5. Actualiza en el mismo cambio `docs/API.md`, `docs/DATA_MODEL.md` y `.env.example` si tocaste endpoints, esquema o variables. **Mantener `docs/` y `tasks/` al día es parte de cada tarea y cuenta como solicitud explícita de documentación.**
+6. Si tomaste una decisión de arquitectura nueva, agrega un ADR (`docs/ADR/README.md` explica cómo).
+7. Ejecuta `vendor/bin/sail bin pint --dirty --format agent`, `vendor/bin/sail composer types:check` y las pruebas afectadas.
+8. Marca la tarea como `Hecha` solo si se cumplen todos los criterios de aceptación. Si algo quedó pendiente, déjala `En progreso` y anota lo que falta.
+
+## 4. Reglas del dominio (no negociables)
+
+- **Estados de llenado:** `vacio` (0–10 %), `bajo` (11–40 %), `medio` (41–70 %), `alto` (71–89 %), `lleno` (90–100 %). Con estado **vigente**, solo `alto` y `lleno` entran en una ruta y los demás cuentan como excluidos (KPI-06). Un punto **sin estado vigente** (la gran mayoría: cientos de puntos y solo dos sensores en el piloto) entra por el calendario de su sector ([ADR-0013](docs/ADR/0013-estado-de-puntos-sin-sensor.md)). Nunca trates "desconocido" como `vacio`.
+- **Porcentaje de llenado:** `clamp((altura_contenedor_cm − distancia_cm) / (altura_contenedor_cm − distancia_sensor_lleno_cm) × 100, 0, 100)`, redondeado a entero, con ambos valores configurados por dispositivo (`distancia_sensor_lleno_cm = 0` equivale a la fórmula simple `(altura − distancia) / altura`).
+- **Idempotencia offline:** cada recolección trae un `sync_uuid` (UUID v4 generado en el teléfono). Si ya existe, se responde `200` sin duplicar.
+- **GPS proporcional (Ley 21.719 y art. 5° del Código del Trabajo):** solo se aceptan pings de un chofer con ruta `en_curso`. Nunca se rastrea fuera de la jornada.
+- **Datos personales:** nombre y teléfono del chofer se guardan con el cast `encrypted`; el RUT solo como HMAC (`Chofer::hashRut`). Nunca registres datos personales en logs ni en `audit_logs.detalles`.
+- **Sin datos simulados:** ningún endpoint devuelve datos inventados ni de ejemplo. Si no hay datos, se responde vacío o con el error correspondiente. Los seeders de demostración usan datos reales o claramente marcados como de prueba.
+- **Roles:** `administrador` (panel), `chofer` (app), `sysadmin` (reservado). Protege cada ruta con `auth:sanctum`, `active` y `role:<rol>`.
+- **Camiones arrendados:** no hay OBD2 ni GPS instalado en el camión ([ADR-0004](docs/ADR/0004-gps-desde-el-telefono-del-chofer.md)).
+
+## 5. Convenciones de código
+
+- Dominio en **español** (tablas, columnas, modelos, mensajes de error, nombres de métodos de dominio). El código de framework y las palabras reservadas siguen en inglés.
+- Tablas en plural y snake_case (`camiones`, `ruta_puntos`). Modelos en singular con `#[Table('...')]` cuando el plural no es regular.
+- Endpoints bajo `Route::prefix('v1')` en `routes/api.php`, con controladores en `app/Http/Controllers/Api/V1/`.
+- Validación en `FormRequest` (`app/Http/Requests/<Recurso>/`) y salida con `JsonResource` (`{"data": …}`). Errores con `{"message": "…"}` y el código HTTP correcto (401, 403, 404, 409, 422, 429).
+- Lógica de negocio no trivial en `app/Services/` (p. ej. `Rutas/GeneradorDeRutas`, `Iot/ProcesadorDeTelemetria`, `Kpi/CalculadoraDeKpi`). Los controladores quedan delgados.
+- Fechas en UTC con ISO 8601 en la API (`2026-11-18T14:05:00Z`). Usa `timestampTz` en las columnas nuevas.
+- Coordenadas WGS84 (SRID 4326), latitud y longitud con 7 decimales.
+- Commits en español con Conventional Commits, siguiendo `git log`: `feat(api): …`, `fix(auth): …`, `docs(tareas): …`, `test(rutas): …`. Sin coautorías de IA.
+
+## 6. Comandos
+
+Todo se ejecuta a través de Sail (ver guías de Boost abajo):
+
+```bash
+vendor/bin/sail up -d
+vendor/bin/sail artisan migrate:fresh --seed
+vendor/bin/sail artisan test --compact --filter=Camion
+vendor/bin/sail bin pint --dirty --format agent
+vendor/bin/sail composer types:check
+```
+
+## 7. Límites
+
+- **No edites** el repo hermano `../logistica_camion_front_end`. Puedes leerlo para verificar qué consume el cliente (`lib/features/*/data/*_repository.dart`).
+- No agregues dependencias de Composer sin que la tarea lo indique o sin aprobación.
+- No modifiques `.env`, no commitees secretos y no imprimas el valor de `APP_KEY`.
+- No inventes datos técnicos ni de costos (alcance del sensor, consumo de batería, precios). Si una tarea los pide, deja la fuente o márcalos como `POR CONFIRMAR`.
+- Fuera de alcance: facturación, integración contable o de RR. HH., predicción con IA, mantención mecánica de vehículos.
+
+---
+
 <laravel-boost-guidelines>
 === foundation rules ===
 
