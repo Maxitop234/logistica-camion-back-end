@@ -38,6 +38,15 @@ coverage/
 /iot-esp32/**/wifi_secrets.h
 /iot-esp32/**/secrets.h
 
+# Ruteo OSRM (datos OSM preprocesados, BE-10)
+/docker/osrm/data/
+*.osm.pbf
+*.osrm*
+
+# Claude Code (configuración y notas personales)
+/.claude/settings.local.json
+CLAUDE.local.md
+
 # Entornos de Agentes de IA
 .opencode/
 .antigravity/cache/
