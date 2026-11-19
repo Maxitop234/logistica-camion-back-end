@@ -28,6 +28,10 @@ use Illuminate\Support\Carbon;
  * @property int|null $licencia_verificada_por_user_id
  * @property Carbon|null $licencia_verificada_en
  * @property bool $licencia_borrado_habilitado
+ * @property string|null $motivo_desactivacion
+ * @property Carbon|null $desactivado_en
+ * @property int|null $desactivado_por_user_id
+ * @property int $ciclo_desactivacion
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -47,6 +51,10 @@ use Illuminate\Support\Carbon;
     'licencia_verificada_por_user_id',
     'licencia_verificada_en',
     'licencia_borrado_habilitado',
+    'motivo_desactivacion',
+    'desactivado_en',
+    'desactivado_por_user_id',
+    'ciclo_desactivacion',
 ])]
 class Chofer extends Model
 {
@@ -121,6 +129,8 @@ class Chofer extends Model
             'licencia_subida_en' => 'datetime',
             'licencia_verificada_en' => 'datetime',
             'licencia_borrado_habilitado' => 'boolean',
+            'desactivado_en' => 'datetime',
+            'ciclo_desactivacion' => 'integer',
         ];
     }
 
@@ -162,5 +172,49 @@ class Chofer extends Model
     public function ultimaSolicitudBorrado(): HasOne
     {
         return $this->hasOne(SolicitudBorradoLicencia::class)->latestOfMany();
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function desactivadoPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'desactivado_por_user_id');
+    }
+
+    /**
+     * @return HasMany<SolicitudReactivacionChofer, $this>
+     */
+    public function solicitudesReactivacion(): HasMany
+    {
+        return $this->hasMany(SolicitudReactivacionChofer::class);
+    }
+
+    /**
+     * @return HasOne<SolicitudReactivacionChofer, $this>
+     */
+    public function ultimaSolicitudReactivacion(): HasOne
+    {
+        return $this->hasOne(SolicitudReactivacionChofer::class)->latestOfMany();
+    }
+
+    /**
+     * Devuelve la solicitud de reactivación del ciclo de desactivación vigente.
+     */
+    public function solicitudReactivacionCicloActual(): ?SolicitudReactivacionChofer
+    {
+        $ultima = $this->relationLoaded('ultimaSolicitudReactivacion')
+            ? $this->ultimaSolicitudReactivacion
+            : $this->ultimaSolicitudReactivacion()->with('resueltaPor.administrador')->first();
+
+        if (! $ultima instanceof SolicitudReactivacionChofer) {
+            return null;
+        }
+
+        if ($ultima->ciclo_desactivacion !== (int) $this->ciclo_desactivacion) {
+            return null;
+        }
+
+        return $ultima;
     }
 }

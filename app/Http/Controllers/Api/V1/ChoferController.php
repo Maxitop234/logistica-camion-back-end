@@ -3,12 +3,16 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Chofer\DestroyChoferRequest;
 use App\Http\Requests\Chofer\StoreChoferRequest;
 use App\Http\Requests\Chofer\UpdateChoferRequest;
 use App\Http\Resources\ChoferResource;
+use App\Models\AuditLog;
 use App\Models\Chofer;
+use App\Models\SolicitudReactivacionChofer;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +26,7 @@ class ChoferController extends Controller
         'user',
         'camionActual',
         ...LicenciaChoferController::RELACIONES_LICENCIA,
+        'ultimaSolicitudReactivacion.resueltaPor.administrador',
     ];
 
     public function index(): AnonymousResourceCollection
@@ -80,17 +85,70 @@ class ChoferController extends Controller
     }
 
     /**
-     * Desactiva la cuenta (is_active = false), revoca sus tokens y libera su camión.
+     * Desactiva la cuenta (is_active = false), guarda el motivo, inicia un
+     * nuevo ciclo de desactivación, revoca tokens, libera su camión y audita.
      */
-    public function destroy(Chofer $chofer): Response
+    public function destroy(DestroyChoferRequest $request, Chofer $chofer): Response
     {
-        DB::transaction(function () use ($chofer): void {
+        $motivo = $request->validated('motivo') ?? 'Desactivado por el administrador';
+
+        DB::transaction(function () use ($chofer, $motivo, $request): void {
+            $nuevoCiclo = ((int) $chofer->ciclo_desactivacion) + 1;
+
             $chofer->user->update(['is_active' => false]);
             $chofer->user->tokens()->delete();
-            $chofer->update(['disponible' => false]);
+            $chofer->update([
+                'disponible' => false,
+                'motivo_desactivacion' => $motivo,
+                'desactivado_en' => now(),
+                'desactivado_por_user_id' => $request->user()->id,
+                'ciclo_desactivacion' => $nuevoCiclo,
+            ]);
             $chofer->camionActual()->update(['chofer_actual_id' => null]);
+
+            AuditLog::registrar('chofer_desactivado', $request->user(), $request, [
+                'chofer_id' => $chofer->id,
+                'motivo' => $motivo,
+                'ciclo_desactivacion' => $nuevoCiclo,
+            ]);
         });
 
         return response()->noContent();
+    }
+
+    /**
+     * Reactiva manualmente la cuenta del chofer en cualquier momento, limpia el
+     * estado de desactivación/solicitudes pendientes del ciclo actual y audita.
+     */
+    public function reactivar(Request $request, Chofer $chofer): ChoferResource|JsonResponse
+    {
+        if ($chofer->user->is_active) {
+            return response()->json(['message' => 'La cuenta del chofer ya está activa.'], 422);
+        }
+
+        DB::transaction(function () use ($chofer, $request): void {
+            $chofer->user->update(['is_active' => true]);
+            $chofer->update([
+                'motivo_desactivacion' => null,
+                'desactivado_en' => null,
+                'desactivado_por_user_id' => null,
+            ]);
+
+            $chofer->solicitudesReactivacion()
+                ->where('estado', SolicitudReactivacionChofer::ESTADO_PENDIENTE)
+                ->update([
+                    'estado' => SolicitudReactivacionChofer::ESTADO_APROBADA,
+                    'resuelta_por_user_id' => $request->user()->id,
+                    'resuelta_en' => now(),
+                ]);
+
+            AuditLog::registrar('chofer_reactivado', $request->user(), $request, [
+                'chofer_id' => $chofer->id,
+                'ciclo_desactivacion' => (int) $chofer->ciclo_desactivacion,
+                'origen' => 'manual',
+            ]);
+        });
+
+        return new ChoferResource($chofer->fresh()->load(self::RELACIONES));
     }
 }

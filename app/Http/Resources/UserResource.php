@@ -18,9 +18,14 @@ class UserResource extends JsonResource
     public function toArray(Request $request): array
     {
         $chofer = $this->role === 'chofer'
-            ? $this->chofer()->with(['licenciaVerificadaPor.administrador', 'ultimaSolicitudBorrado.resueltaPor.administrador'])->first()
+            ? $this->chofer()->with([
+                'licenciaVerificadaPor.administrador',
+                'ultimaSolicitudBorrado.resueltaPor.administrador',
+                'ultimaSolicitudReactivacion.resueltaPor.administrador',
+            ])->first()
             : null;
         $administrador = $this->role === 'administrador' ? $this->administrador : null;
+        $solicitudReactivacion = $chofer?->solicitudReactivacionCicloActual();
 
         $datos = [
             'id' => $this->id,
@@ -34,6 +39,11 @@ class UserResource extends JsonResource
                     'telefono' => $chofer->telefono_cifrado,
                     'licencia_clase' => $chofer->licencia_clase,
                     'disponible' => $chofer->disponible,
+                    'motivo_desactivacion' => $chofer->motivo_desactivacion,
+                    'desactivado_en' => $chofer->desactivado_en?->toIso8601String(),
+                    'solicitud_reactivacion' => $solicitudReactivacion
+                        ? SolicitudReactivacionChoferResource::resumen($solicitudReactivacion)
+                        : null,
                     'licencia' => LicenciaChoferResource::resumen($chofer),
                 ],
                 $administrador !== null => [

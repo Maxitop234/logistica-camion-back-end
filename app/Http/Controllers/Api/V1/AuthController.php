@@ -44,7 +44,7 @@ class AuthController extends Controller
             return response()->json(['message' => 'Credenciales inválidas.'], 401);
         }
 
-        if (! $user->is_active) {
+        if (! $user->is_active && $user->role !== 'chofer') {
             RateLimiter::hit($clave, self::VENTANA_SEGUNDOS);
             AuditLog::registrar('failed_login', $user, $request, [
                 'email' => $email,
@@ -58,7 +58,10 @@ class AuthController extends Controller
         RateLimiter::clear($clave);
 
         $token = $user->createToken($deviceName)->plainTextToken;
-        AuditLog::registrar('login', $user, $request, ['device_name' => $deviceName]);
+        AuditLog::registrar('login', $user, $request, [
+            'device_name' => $deviceName,
+            ...(! $user->is_active ? ['cuenta_inactiva' => true] : []),
+        ]);
 
         return response()->json([
             'token' => $token,

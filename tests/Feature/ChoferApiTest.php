@@ -103,19 +103,28 @@ test('actualiza nombre, licencia, telefono y disponibilidad', function () {
         ->and($chofer->disponible)->toBeFalse();
 });
 
-test('desactivar un chofer inactiva su cuenta, revoca tokens y libera su camion', function () {
+test('desactivar un chofer guarda motivo, inactiva su cuenta, revoca tokens y libera su camion', function () {
     $chofer = Chofer::factory()->create();
     $camion = Camion::factory()->create(['chofer_actual_id' => $chofer->id]);
     $chofer->user->createToken('pixel');
 
-    $this->actingAs($this->admin, 'sanctum')->deleteJson("/api/v1/choferes/{$chofer->id}")->assertNoContent();
+    $this->actingAs($this->admin, 'sanctum')
+        ->deleteJson("/api/v1/choferes/{$chofer->id}", ['motivo' => 'Licencia médica'])
+        ->assertNoContent();
 
     expect($chofer->user->fresh()->is_active)->toBeFalse()
         ->and($chofer->user->tokens()->count())->toBe(0)
         ->and($chofer->fresh()->disponible)->toBeFalse()
+        ->and($chofer->fresh()->motivo_desactivacion)->toBe('Licencia médica')
         ->and($camion->fresh()->chofer_actual_id)->toBeNull();
 
-    $this->postJson('/api/v1/auth/login', [
+    $token = $this->postJson('/api/v1/auth/login', [
         'email' => $chofer->user->email, 'password' => 'password', 'device_name' => 'pixel',
-    ])->assertForbidden();
+    ])
+        ->assertOk()
+        ->assertJsonPath('user.is_active', false)
+        ->assertJsonPath('user.perfil.motivo_desactivacion', 'Licencia médica')
+        ->json('token');
+
+    $this->withToken($token)->getJson('/api/v1/chofer/licencia')->assertForbidden();
 });

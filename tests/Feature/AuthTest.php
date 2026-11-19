@@ -63,13 +63,39 @@ test('un email inexistente registra failed_login sin usuario', function () {
     expect(AuditLog::where('accion', 'failed_login')->first()->user_id)->toBeNull();
 });
 
-test('un usuario inactivo no puede entrar aunque la contrasena sea correcta', function () {
-    $user = User::factory()->create(['is_active' => false]);
+test('un administrador o sysadmin inactivo no puede entrar aunque la contrasena sea correcta', function () {
+    $admin = User::factory()->create(['role' => 'administrador', 'is_active' => false]);
 
-    $this->postJson('/api/v1/auth/login', credenciales($user))->assertForbidden();
+    $this->postJson('/api/v1/auth/login', credenciales($admin))->assertForbidden();
 
-    expect($user->tokens()->count())->toBe(0)
+    expect($admin->tokens()->count())->toBe(0)
         ->and(AuditLog::where('accion', 'failed_login')->first()->detalles['motivo'])->toBe('usuario_inactivo');
+});
+
+test('un chofer inactivo puede entrar, ver su estado y cerrar sesion, pero no acceder a rutas operativas', function () {
+    $chofer = Chofer::factory()->create([
+        'motivo_desactivacion' => 'Licencia médica',
+        'desactivado_en' => now(),
+        'ciclo_desactivacion' => 1,
+    ]);
+    $chofer->user->update(['is_active' => false]);
+
+    $token = $this->postJson('/api/v1/auth/login', credenciales($chofer->user))
+        ->assertOk()
+        ->assertJsonPath('user.is_active', false)
+        ->assertJsonPath('user.perfil.motivo_desactivacion', 'Licencia médica')
+        ->json('token');
+
+    $this->withToken($token)->getJson('/api/v1/auth/me')
+        ->assertOk()
+        ->assertJsonPath('data.is_active', false);
+
+    // Las rutas operativas devuelven 403 sin revocar el token del chofer.
+    $this->withToken($token)->getJson('/api/v1/chofer/licencia')->assertForbidden();
+    expect($chofer->user->tokens()->count())->toBe(1);
+
+    $this->withToken($token)->postJson('/api/v1/auth/logout')->assertOk();
+    expect($chofer->user->tokens()->count())->toBe(0);
 });
 
 test('tras 5 intentos fallidos el login responde 429 incluso con la clave correcta', function () {
@@ -145,8 +171,8 @@ test('me sin token devuelve 401 en json', function () {
     $this->getJson('/api/v1/auth/me')->assertUnauthorized();
 });
 
-test('un token de un usuario desactivado despues del login es rechazado y revocado', function () {
-    $user = User::factory()->create();
+test('un token de un administrador desactivado despues del login es rechazado y revocado', function () {
+    $user = User::factory()->create(['role' => 'administrador']);
     $token = $this->postJson('/api/v1/auth/login', credenciales($user))->json('token');
 
     $user->update(['is_active' => false]);
