@@ -24,7 +24,7 @@ services:
         depends_on:
             - pgsql
     pgsql:
-        image: 'postgres:18-alpine'
+        image: 'postgis/postgis:18-3.6-alpine'
         ports:
             - '${FORWARD_DB_PORT:-5432}:5432'
         environment:
