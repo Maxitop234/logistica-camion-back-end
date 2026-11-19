@@ -29,6 +29,7 @@ class ChoferResource extends JsonResource
                 'id' => $this->camionActual->id,
                 'patente' => $this->camionActual->patente,
             ] : null),
+            'licencia' => LicenciaChoferResource::resumen($this->resource),
         ];
     }
 }

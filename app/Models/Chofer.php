@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
@@ -19,15 +20,42 @@ use Illuminate\Support\Carbon;
  * @property string $licencia_clase
  * @property string|null $telefono_cifrado
  * @property bool $disponible
+ * @property string $licencia_estado
+ * @property string|null $licencia_archivo_path
+ * @property string|null $licencia_archivo_nombre
+ * @property string|null $licencia_archivo_sha256
+ * @property Carbon|null $licencia_subida_en
+ * @property int|null $licencia_verificada_por_user_id
+ * @property Carbon|null $licencia_verificada_en
+ * @property bool $licencia_borrado_habilitado
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
 #[Table('choferes')]
-#[Fillable(['user_id', 'nombre_cifrado', 'rut_hash', 'licencia_clase', 'telefono_cifrado', 'disponible'])]
+#[Fillable([
+    'user_id',
+    'nombre_cifrado',
+    'rut_hash',
+    'licencia_clase',
+    'telefono_cifrado',
+    'disponible',
+    'licencia_estado',
+    'licencia_archivo_path',
+    'licencia_archivo_nombre',
+    'licencia_archivo_sha256',
+    'licencia_subida_en',
+    'licencia_verificada_por_user_id',
+    'licencia_verificada_en',
+    'licencia_borrado_habilitado',
+])]
 class Chofer extends Model
 {
     /** @use HasFactory<ChoferFactory> */
     use HasFactory;
+
+    public const LICENCIA_PENDIENTE = 'pendiente';
+
+    public const LICENCIA_VERIFICADA = 'verificada';
 
     /**
      * Normaliza un RUT chileno: sin puntos, guion ni espacios y con K en mayúscula.
@@ -74,6 +102,11 @@ class Chofer extends Model
         return $dv === $esperado;
     }
 
+    public function tieneArchivoLicencia(): bool
+    {
+        return is_string($this->licencia_archivo_path) && $this->licencia_archivo_path !== '';
+    }
+
     /**
      * Get the attributes that should be cast.
      *
@@ -85,6 +118,9 @@ class Chofer extends Model
             'nombre_cifrado' => 'encrypted',
             'telefono_cifrado' => 'encrypted',
             'disponible' => 'boolean',
+            'licencia_subida_en' => 'datetime',
+            'licencia_verificada_en' => 'datetime',
+            'licencia_borrado_habilitado' => 'boolean',
         ];
     }
 
@@ -102,5 +138,29 @@ class Chofer extends Model
     public function camionActual(): HasOne
     {
         return $this->hasOne(Camion::class, 'chofer_actual_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function licenciaVerificadaPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'licencia_verificada_por_user_id');
+    }
+
+    /**
+     * @return HasMany<SolicitudBorradoLicencia, $this>
+     */
+    public function solicitudesBorradoLicencia(): HasMany
+    {
+        return $this->hasMany(SolicitudBorradoLicencia::class);
+    }
+
+    /**
+     * @return HasOne<SolicitudBorradoLicencia, $this>
+     */
+    public function ultimaSolicitudBorrado(): HasOne
+    {
+        return $this->hasOne(SolicitudBorradoLicencia::class)->latestOfMany();
     }
 }

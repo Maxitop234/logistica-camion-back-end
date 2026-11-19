@@ -15,9 +15,18 @@ use Illuminate\Support\Facades\DB;
 
 class ChoferController extends Controller
 {
+    /**
+     * @var array<int, string>
+     */
+    private const RELACIONES = [
+        'user',
+        'camionActual',
+        ...LicenciaChoferController::RELACIONES_LICENCIA,
+    ];
+
     public function index(): AnonymousResourceCollection
     {
-        return ChoferResource::collection(Chofer::with(['user', 'camionActual'])->orderBy('id')->get());
+        return ChoferResource::collection(Chofer::with(self::RELACIONES)->orderBy('id')->get());
     }
 
     /**
@@ -43,12 +52,12 @@ class ChoferController extends Controller
             ]);
         });
 
-        return (new ChoferResource($chofer->load(['user', 'camionActual'])))->response()->setStatusCode(201);
+        return (new ChoferResource($chofer->fresh()->load(self::RELACIONES)))->response()->setStatusCode(201);
     }
 
     public function show(Chofer $chofer): ChoferResource
     {
-        return new ChoferResource($chofer->load(['user', 'camionActual']));
+        return new ChoferResource($chofer->load(self::RELACIONES));
     }
 
     public function update(UpdateChoferRequest $request, Chofer $chofer): ChoferResource
@@ -67,7 +76,7 @@ class ChoferController extends Controller
 
         $chofer->update($cambios);
 
-        return new ChoferResource($chofer->load(['user', 'camionActual']));
+        return new ChoferResource($chofer->load(self::RELACIONES));
     }
 
     /**
