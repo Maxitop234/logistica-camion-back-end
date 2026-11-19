@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\ChoferController;
 use App\Http\Controllers\Api\V1\LicenciaChoferController;
 use App\Http\Controllers\Api\V1\NotificacionLicenciaController;
 use App\Http\Controllers\Api\V1\ReactivacionChoferController;
+use App\Http\Controllers\Api\V1\RutaController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -30,18 +31,28 @@ Route::prefix('v1')->group(function () {
     });
 
     // Endpoints operativos del chofer (bloqueados con 403 si está inactivo, sin revocar token).
-    Route::middleware(['auth:sanctum', 'active', 'role:chofer'])->prefix('chofer')->group(function () {
-        Route::get('licencia', [LicenciaChoferController::class, 'miLicencia']);
-        Route::post('licencia', [LicenciaChoferController::class, 'subir']);
-        Route::get('licencia/archivo', [LicenciaChoferController::class, 'miArchivo']);
-        Route::post('licencia/solicitud-borrado', [LicenciaChoferController::class, 'solicitarBorrado']);
-        Route::delete('licencia', [LicenciaChoferController::class, 'eliminarPropia']);
+    Route::middleware(['auth:sanctum', 'active', 'role:chofer'])->group(function () {
+        Route::prefix('chofer')->group(function () {
+            Route::get('licencia', [LicenciaChoferController::class, 'miLicencia']);
+            Route::post('licencia', [LicenciaChoferController::class, 'subir']);
+            Route::get('licencia/archivo', [LicenciaChoferController::class, 'miArchivo']);
+            Route::post('licencia/solicitud-borrado', [LicenciaChoferController::class, 'solicitarBorrado']);
+            Route::delete('licencia', [LicenciaChoferController::class, 'eliminarPropia']);
+            Route::get('ruta-activa', [RutaController::class, 'rutaActiva']);
+        });
+
+        Route::post('rutas/{ruta}/iniciar', [RutaController::class, 'iniciar']);
+        Route::post('rutas/{ruta}/sincronizar-lote', [RutaController::class, 'sincronizarLote']);
+        Route::post('rutas/{ruta}/finalizar', [RutaController::class, 'finalizar']);
     });
 
     Route::middleware(['auth:sanctum', 'active', 'role:administrador'])->group(function () {
         Route::apiResource('camiones', CamionController::class)->parameters(['camiones' => 'camion']);
         Route::apiResource('choferes', ChoferController::class)->parameters(['choferes' => 'chofer']);
         Route::post('choferes/{chofer}/reactivar', [ChoferController::class, 'reactivar']);
+
+        Route::get('rutas', [RutaController::class, 'index']);
+        Route::post('rutas/generar', [RutaController::class, 'generar']);
 
         Route::get('choferes/{chofer}/licencia/archivo', [LicenciaChoferController::class, 'archivoPorAdmin']);
         Route::post('choferes/{chofer}/licencia/verificar', [LicenciaChoferController::class, 'verificar']);

@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Administrador;
 use App\Models\Camion;
 use App\Models\Chofer;
+use App\Models\Punto;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
@@ -22,6 +23,8 @@ class DatabaseSeeder extends Seeder
         $choferes = $this->crearChoferes();
 
         $this->crearCamiones($choferes);
+
+        $this->crearPuntos();
     }
 
     private function crearAdministrador(): void
@@ -93,6 +96,44 @@ class DatabaseSeeder extends Seeder
                     'capacidad_kg' => $capacidad,
                     'estado_operativo' => $estado,
                     'chofer_actual_id' => $estado === 'disponible' ? $choferes[$i]->id : null,
+                ],
+            );
+        }
+    }
+
+    private function crearPuntos(): void
+    {
+        $puntos = [
+            ['Condominio Los Pablos', 'Av. Pablo Neruda 01450, Temuco', 'condominio', -38.7180, -72.6050, 'lleno', 94],
+            ['Punto limpio Av. Alemania', 'Av. Alemania 0671, Temuco', 'punto_calle', -38.7330, -72.6100, 'alto', 82],
+            ['Universidad de La Frontera', 'Av. Francisco Salazar 01145, Temuco', 'empresa', -38.7480, -72.6170, 'lleno', 91],
+            ['Feria Pinto', 'Av. Barros Arana 1150, Temuco', 'punto_calle', -38.7400, -72.5850, 'alto', 79],
+            ['Portal Temuco', 'Av. Alemania 0671, sector poniente', 'empresa', -38.7355, -72.6155, 'lleno', 96],
+            ['Parque Estadio Germán Becker', 'Av. Pablo Neruda 01110, Temuco', 'municipio', -38.7422, -72.6205, 'alto', 76],
+            ['Hospital Regional de Temuco', 'Manuel Montt 115, Temuco', 'municipio', -38.7368, -72.5965, 'alto', 85],
+            ['Plaza Aníbal Pinto', 'Bulnes con Claro Solar, Temuco', 'municipio', -38.7359, -72.5904, 'medio', 52],
+            ['Municipalidad de Padre Las Casas', 'Maquehue 1441, Padre Las Casas', 'municipio', -38.7700, -72.5950, 'vacio', 8],
+            ['Sector Pueblo Nuevo', 'Av. Javiera Carrera 1300, Temuco', 'punto_calle', -38.7230, -72.5800, 'medio', 61],
+            ['Sector Pedro de Valdivia', 'Av. Pedro de Valdivia 01850, Temuco', 'condominio', -38.7155, -72.6250, 'bajo', 28],
+            ['Sector Amanecer', 'Av. Recabarren 02650, Temuco', 'punto_calle', -38.7580, -72.6280, 'medio', 49],
+            ['Sector Santa Rosa', 'Av. Prieto Norte 0850, Temuco', 'punto_calle', -38.7310, -72.5730, 'bajo', 22],
+            ['Costanera del Cautín', 'Av. Los Poetas 0450, Temuco', 'punto_calle', -38.7510, -72.5920, 'vacio', 5],
+            ['Villa Los Ríos', 'Av. San Martín 01200, Temuco', 'condominio', -38.7415, -72.6060, 'medio', 58],
+            ['Pulmahue Padre Las Casas', 'Villa Alegre 0950, Padre Las Casas', 'condominio', -38.7745, -72.6080, 'bajo', 31],
+        ];
+
+        foreach ($puntos as [$nombre, $direccion, $tipo, $lat, $lng, $estado, $porcentaje]) {
+            Punto::updateOrCreate(
+                ['nombre' => $nombre],
+                [
+                    'direccion' => $direccion,
+                    'tipo_punto' => $tipo,
+                    'latitud' => $lat,
+                    'longitud' => $lng,
+                    'estado_llenado' => $estado,
+                    'porcentaje_llenado' => $porcentaje,
+                    'ultima_actualizacion_estado' => now(),
+                    'activo' => true,
                 ],
             );
         }
