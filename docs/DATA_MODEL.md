@@ -1,13 +1,13 @@
 # Modelo de datos — EcoRuta Temuco
 
-Base de datos relacional en **PostgreSQL** con la extensión **PostGIS** (pendiente de habilitar, BE-01), normalizada en 3FN.
+Base de datos relacional en **PostgreSQL** con la extensión **PostGIS** (habilitada por la migración `enable_postgis_extension`), normalizada en 3FN.
 Las tablas ✅ existen en `database/migrations/`. Las ⏳ son el diseño objetivo que deben implementar las tareas indicadas.
 
 ## 1. Convenciones
 
 - Nombres en español, snake_case, tablas en plural (`camiones`, `ruta_puntos`). Claves primarias `id` (`bigIncrements`) y foráneas `<entidad>_id`.
 - Fechas y horas en UTC. Las columnas nuevas usan `timestampTz` (las existentes usan `timestamp`).
-- Coordenadas WGS84 con `decimal(10,7)` (`latitud`, `longitud`). Cuando PostGIS esté habilitado, se agrega una columna `ubicacion geography(Point, 4326)` con índice GiST en `puntos` (BE-01, BE-03).
+- Coordenadas WGS84 con `decimal(10,7)` (`latitud`, `longitud`). Con PostGIS se agrega una columna `ubicacion geography(Point, 4326)` con índice GiST en `puntos` (BE-01, BE-03).
 - Enumeraciones con `string` + validación en PHP (enum de PHP en `app/Enums/`) para no depender de tipos `ENUM` difíciles de migrar. Las tablas existentes usan `enum()` de Laravel; se mantiene así.
 - Bajas lógicas con `activo`/`is_active`, nunca `DELETE` físico de datos operativos.
 - Datos personales cifrados con el cast `encrypted` (AES-256 con `APP_KEY`); identificadores sensibles como HMAC-SHA256.

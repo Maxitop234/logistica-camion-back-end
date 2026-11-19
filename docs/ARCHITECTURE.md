@@ -59,7 +59,7 @@ flowchart LR
 |---|---|---|
 | API REST | Laravel 13, PHP 8.5, Sanctum | 🟡 Parcial (auth, camiones, choferes) |
 | Worker y scheduler | `queue:work`, `schedule:run` | ⏳ Pendiente (KPI periódicos, limpieza de GPS, alertas) |
-| Base de datos | PostgreSQL 18 (Sail) / RDS + PostGIS | 🟡 PostgreSQL sí; PostGIS pendiente (BE-01) |
+| Base de datos | PostgreSQL 18 + PostGIS 3.6 (`postgis/postgis:18-3.6-alpine` en Sail y CI) / RDS + PostGIS | ✅ |
 | Motor de ruteo | OSRM (`osrm/osrm-backend`) con extracto OSM recortado a Temuco–Padre Las Casas | ⏳ Pendiente (BE-10) |
 | Panel admin y app chofer | Flutter (repo hermano) | 🟡 Parcial; vistas simuladas por reemplazar |
 | Firmware del nodo | ESP32 DevKit + sensor ultrasónico, PlatformIO | ⏳ Pendiente (IOT-01) |
@@ -184,5 +184,5 @@ Actualizar los diagramas con estos cambios es la tarea DOC-02.
 | Choferes | Clase de licencia como texto libre | Documento de licencia, vencimiento, verificación y regla clase ↔ camión | La clase declarada no tenía respaldo verificable ([ADR-0010](ADR/0010-validacion-documental-de-licencias.md)) |
 | Secciones del panel | Flota, puntos, rutas y KPI | Además: kits de sensores, administración de GPS y comunicaciones | Secciones necesarias para operar sensores, GPS y comunicaciones |
 | Nombres de tablas | `usuarios`, `puntos_reciclaje`, `paradas_ruta`, `telemetria_gps`, `lecturas_sensor_iot` | `users`, `puntos`, `ruta_puntos`, `ubicaciones_gps`, `lecturas_iot` | Convención de Laravel; equivalencias en [DATA_MODEL.md](DATA_MODEL.md) |
-| Coordenadas | `GEOMETRY(Point/LineString, 4326)` | `decimal(10,7)` en `camiones`; PostGIS por habilitar (BE-01) | La imagen de Sail no incluye PostGIS |
+| Coordenadas | `GEOMETRY(Point/LineString, 4326)` | `decimal(10,7)` en `camiones`; PostGIS habilitado para las columnas geográficas nuevas (BE-01, BE-03) | Los clientes reciben latitud y longitud decimales |
 | Panel web | "Aplicación web" sin tecnología explícita | Flutter web (misma base de código que la app) | [ADR-0002 del front-end](../../logistica_camion_front_end/docs/ADR/0002-flutter-base-unica-web-y-movil.md) |

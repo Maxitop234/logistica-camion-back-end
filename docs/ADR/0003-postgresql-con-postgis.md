@@ -1,6 +1,6 @@
 # ADR-0003: PostgreSQL con PostGIS como base de datos
 
-- **Estado:** Aceptada (PostGIS pendiente de habilitar en BE-01)
+- **Estado:** Aceptada (PostGIS habilitado en BE-01, 2026-11-18)
 - **Fecha:** 2026-10-24
 - **Relacionado con:** BE-01, BE-03, BE-10
 

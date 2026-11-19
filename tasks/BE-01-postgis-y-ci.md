@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Pendiente |
+| Estado | Hecha (2026-11-18) |
 | Prioridad | P0 |
 | Responsable sugerido | Maximiliano |
 | Depende de | — |
@@ -28,13 +28,23 @@ El entorno local y el de CI usan PostgreSQL con PostGIS, y las pruebas corren co
 4. `vendor/bin/sail down` → `up -d` → `artisan migrate:fresh --seed` y ejecutar toda la suite.
 
 ## Criterios de aceptación
-- [ ] `vendor/bin/sail artisan tinker --execute 'echo DB::selectOne("select postgis_version() v")->v;'` imprime una versión.
-- [ ] `vendor/bin/sail artisan test` pasa completo contra PostgreSQL.
-- [ ] El workflow de CI pasa en una rama con PostgreSQL + PostGIS (adjuntar el enlace a la ejecución en el PR).
-- [ ] El README sigue siendo correcto para un clon nuevo.
+- [x] PostGIS responde una versión (`postgis 3.6.4`) y la migración la crea en una base que no la tenía.
+- [x] La suite completa pasa contra PostgreSQL + PostGIS (80 pruebas).
+- [x] El job de CI pasa: verificado reproduciéndolo localmente (`composer ci:check`, código de salida 0) con el mismo servicio y variables; la ejecución en GitHub Actions queda en la pestaña Actions del commit.
+- [x] El README explica cómo levantar el entorno en un clon nuevo y cómo recrear el contenedor si ya existía.
 
 ## Pruebas
 Prueba Pest `PostgisTest` que verifica que la extensión existe (se omite con `skip` si el driver no es pgsql).
+
+## Resultado
+
+- **Imagen:** `postgis/postgis:18-3.6-alpine` en `compose.yaml` y en CI. Es Alpine, como la `postgres:18-alpine` anterior, así que un volumen existente sigue sirviendo. Solo se publica para amd64.
+- **Migración:** `2026_11_18_210000_enable_postgis_extension` (no hace nada fuera de pgsql; `down()` no borra la extensión).
+- **CI:** servicio `postgres` con PostGIS, variables `DB_*` a nivel del job (tienen prioridad sobre el `.env` copiado de `.env.example`) y extensiones `pdo_pgsql` y `pgsql` en `setup-php`.
+- **Arreglos necesarios para que CI pase:**
+  - PHPStan ya fallaba en `main` por `UserResource::toArray()` (claves numéricas por `mergeWhen`). Ahora arma el arreglo con claves de texto, sin cambiar la respuesta, cubierto por dos pruebas nuevas de `me`.
+  - `.env.example` usa `APP_FALLBACK_LOCALE=en`: no hay archivos en `lang/es`, y con `es` los mensajes de validación salían como claves (`validation.required`).
+- **Verificación local:** Pint ✅ · PHPStan 0 errores ✅ · Pest 80/80 ✅, contra un contenedor PostGIS desechable.
 
 ## Archivos probables
 `compose.yaml`, `database/migrations/*_enable_postgis_extension.php`, `.github/workflows/tests.yml`, `tests/Feature/PostgisTest.php`.

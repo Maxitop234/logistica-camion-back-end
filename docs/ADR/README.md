@@ -8,7 +8,7 @@ Cada decisión importante se registra en un archivo corto e inmutable, el *Archi
 |---|---|---|---|
 | [0001](0001-registrar-decisiones-con-adr.md) | Registrar las decisiones de arquitectura con ADR | Aceptada | 2026-11-18 |
 | [0002](0002-api-rest-laravel-con-sanctum-y-roles.md) | API REST en Laravel, versionada, con Sanctum y roles | Aceptada | 2026-10-23 |
-| [0003](0003-postgresql-con-postgis.md) | PostgreSQL con PostGIS como base de datos | Aceptada (PostGIS pendiente) | 2026-10-24 |
+| [0003](0003-postgresql-con-postgis.md) | PostgreSQL con PostGIS como base de datos | Aceptada | 2026-10-24 |
 | [0004](0004-gps-desde-el-telefono-del-chofer.md) | Rastreo GPS desde el teléfono del chofer | Aceptada | 2026-10-24 |
 | [0005](0005-openstreetmap-y-osrm-en-lugar-de-google-maps.md) | OpenStreetMap y OSRM en lugar de Google Maps Platform | **Propuesta** | 2026-11-18 |
 | [0006](0006-cifrado-de-datos-personales-del-chofer.md) | Cifrado de los datos personales del chofer | Aceptada | 2026-11-14 |

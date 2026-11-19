@@ -28,7 +28,7 @@ El plan de tareas anterior quedó archivado en [`_archivo/plan-original-tareas.m
 
 | ID | Tarea | Prio | Depende de | Resp. | Sprint | Estado |
 |---|---|---|---|---|---|---|
-| [BE-01](BE-01-postgis-y-ci.md) | PostgreSQL + PostGIS en Sail y en CI | P0 | — | Maximiliano | A | Pendiente |
+| [BE-01](BE-01-postgis-y-ci.md) | PostgreSQL + PostGIS en Sail y en CI | P0 | — | Maximiliano | A | Hecha |
 | [BE-02](BE-02-endurecimiento-de-seguridad.md) | Endurecimiento: registro público, tokens, auditoría de bajas | P0 | — | Nelson | A | Pendiente |
 | [BE-16](BE-16-staging-https.md) | Servidor de staging accesible por HTTPS | P0 | BE-01 | Maximiliano | A | Pendiente |
 | [BE-03](BE-03-sectores-y-puntos-de-reciclaje.md) | Sectores y puntos de reciclaje (modelo + API) | P0 | BE-01 | Nelson | A | Pendiente |

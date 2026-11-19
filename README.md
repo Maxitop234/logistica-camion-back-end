@@ -108,7 +108,7 @@ logistica-camion-back-end/
 ├── routes/api.php            # Rutas /api/v1
 ├── tasks/                    # Tareas de desarrollo + índice general (BE, FE, IOT, DOC)
 ├── tests/Feature/            # Pruebas Pest de la API
-├── compose.yaml              # Servicios de Sail (app + PostgreSQL)
+├── compose.yaml              # Servicios de Sail (app + PostgreSQL/PostGIS)
 └── .github/workflows/        # CI (lint, tipos, pruebas)
 ```
 
@@ -139,6 +139,8 @@ vendor/bin/sail artisan migrate --seed
 ```
 
 La API queda en `http://localhost` (puerto `APP_PORT`) y responde `{"status":"ok"}` en `/`.
+
+> **Si ya tenías el entorno levantado antes de PostGIS:** recrea el contenedor de la base con `vendor/bin/sail up -d --force-recreate pgsql` y ejecuta `vendor/bin/sail artisan migrate`. El volumen de datos se conserva (la imagen sigue siendo Alpine y PostgreSQL 18). La imagen `postgis/postgis` solo se publica para amd64; en equipos ARM corre emulada.
 
 **Cuentas de desarrollo** (creadas por `DatabaseSeeder`, solo para entornos locales): `admin@ecoruta.test` y `chofer1@ecoruta.test` … `chofer4@ecoruta.test`. La contraseña está en el seeder. La tarea BE-15 la mueve a `DEMO_PASSWORD`.
 
