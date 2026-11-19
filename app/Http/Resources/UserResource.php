@@ -20,7 +20,7 @@ class UserResource extends JsonResource
         $chofer = $this->role === 'chofer' ? $this->chofer : null;
         $administrador = $this->role === 'administrador' ? $this->administrador : null;
 
-        return [
+        $datos = [
             'id' => $this->id,
             'email' => $this->email,
             'role' => $this->role,
@@ -41,12 +41,17 @@ class UserResource extends JsonResource
                 ],
                 default => null,
             },
-            $this->mergeWhen($chofer !== null, fn () => [
-                'camion' => ($camion = Camion::where('chofer_actual_id', $chofer->id)->first())
-                    ? ['id' => $camion->id, 'patente' => $camion->patente, 'estado_operativo' => $camion->estado_operativo]
-                    : null,
-                'ruta_activa' => null,
-            ]),
         ];
+
+        if ($chofer !== null) {
+            $camion = Camion::where('chofer_actual_id', $chofer->id)->first();
+
+            $datos['camion'] = $camion
+                ? ['id' => $camion->id, 'patente' => $camion->patente, 'estado_operativo' => $camion->estado_operativo]
+                : null;
+            $datos['ruta_activa'] = null;
+        }
+
+        return $datos;
     }
 }

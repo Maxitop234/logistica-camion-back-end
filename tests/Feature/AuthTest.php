@@ -120,6 +120,27 @@ test('me devuelve el chofer con su camion asignado', function () {
         ->assertJsonPath('data.ruta_activa', null);
 });
 
+test('me devuelve camion nulo al chofer sin camion asignado', function () {
+    $chofer = Chofer::factory()->create();
+
+    $this->actingAs($chofer->user, 'sanctum')
+        ->getJson('/api/v1/auth/me')
+        ->assertOk()
+        ->assertJsonPath('data.camion', null)
+        ->assertJsonPath('data.ruta_activa', null);
+});
+
+test('me del administrador no incluye camion ni ruta activa', function () {
+    $admin = Administrador::factory()->create();
+
+    $this->actingAs($admin->user, 'sanctum')
+        ->getJson('/api/v1/auth/me')
+        ->assertOk()
+        ->assertJsonPath('data.role', 'administrador')
+        ->assertJsonMissingPath('data.camion')
+        ->assertJsonMissingPath('data.ruta_activa');
+});
+
 test('me sin token devuelve 401 en json', function () {
     $this->getJson('/api/v1/auth/me')->assertUnauthorized();
 });
