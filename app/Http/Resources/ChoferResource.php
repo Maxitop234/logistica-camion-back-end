@@ -37,6 +37,7 @@ class ChoferResource extends JsonResource
                 'patente' => $this->camionActual->patente,
             ] : null),
             'licencia' => LicenciaChoferResource::resumen($this->resource),
+            'avatar' => $this->resource->avatarResuelto(),
         ];
     }
 }

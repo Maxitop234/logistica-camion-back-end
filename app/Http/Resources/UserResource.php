@@ -45,6 +45,7 @@ class UserResource extends JsonResource
                         ? SolicitudReactivacionChoferResource::resumen($solicitudReactivacion)
                         : null,
                     'licencia' => LicenciaChoferResource::resumen($chofer),
+                    'avatar' => $chofer->avatarResuelto(),
                 ],
                 $administrador !== null => [
                     'id' => $administrador->id,

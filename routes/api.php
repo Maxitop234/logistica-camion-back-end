@@ -38,6 +38,7 @@ Route::prefix('v1')->group(function () {
             Route::get('licencia/archivo', [LicenciaChoferController::class, 'miArchivo']);
             Route::post('licencia/solicitud-borrado', [LicenciaChoferController::class, 'solicitarBorrado']);
             Route::delete('licencia', [LicenciaChoferController::class, 'eliminarPropia']);
+            Route::put('avatar', [ChoferController::class, 'actualizarAvatar']);
             Route::get('ruta-activa', [RutaController::class, 'rutaActiva']);
         });
 

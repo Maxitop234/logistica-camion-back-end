@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Chofer\DestroyChoferRequest;
 use App\Http\Requests\Chofer\StoreChoferRequest;
+use App\Http\Requests\Chofer\UpdateAvatarChoferRequest;
 use App\Http\Requests\Chofer\UpdateChoferRequest;
 use App\Http\Resources\ChoferResource;
 use App\Models\AuditLog;
@@ -150,5 +151,30 @@ class ChoferController extends Controller
         });
 
         return new ChoferResource($chofer->fresh()->load(self::RELACIONES));
+    }
+
+    /**
+     * Actualiza la configuración visual del avatar del chofer autenticado.
+     */
+    public function actualizarAvatar(UpdateAvatarChoferRequest $request): JsonResponse
+    {
+        $chofer = $request->user()?->chofer;
+        if (! $chofer instanceof Chofer) {
+            return response()->json(['message' => 'Perfil de chofer no encontrado.'], 404);
+        }
+
+        $datos = $request->validated();
+        $chofer->update([
+            'avatar_config' => [
+                'peinado' => (string) $datos['peinado'],
+                'color_pelo' => (string) $datos['color_pelo'],
+                'tono_piel' => (string) $datos['tono_piel'],
+                'lentes' => (bool) $datos['lentes'],
+            ],
+        ]);
+
+        return response()->json([
+            'data' => $chofer->fresh()->avatarResuelto(),
+        ]);
     }
 }

@@ -32,6 +32,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $desactivado_en
  * @property int|null $desactivado_por_user_id
  * @property int $ciclo_desactivacion
+ * @property array<string, mixed>|null $avatar_config
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -55,6 +56,7 @@ use Illuminate\Support\Carbon;
     'desactivado_en',
     'desactivado_por_user_id',
     'ciclo_desactivacion',
+    'avatar_config',
 ])]
 class Chofer extends Model
 {
@@ -64,6 +66,23 @@ class Chofer extends Model
     public const LICENCIA_PENDIENTE = 'pendiente';
 
     public const LICENCIA_VERIFICADA = 'verificada';
+
+    /** @var array<int, string> */
+    public const AVATAR_PEINADOS = ['corto', 'largo', 'ondas', 'mono', 'rizado', 'rapado'];
+
+    /** @var array<int, string> */
+    public const AVATAR_COLORES_PELO = ['negro', 'castano', 'rubio', 'pelirrojo', 'canoso'];
+
+    /** @var array<int, string> */
+    public const AVATAR_TONOS_PIEL = ['claro', 'medio_claro', 'medio', 'moreno', 'oscuro'];
+
+    /** @var array{peinado: string, color_pelo: string, tono_piel: string, lentes: bool} */
+    public const AVATAR_DEFAULT = [
+        'peinado' => 'corto',
+        'color_pelo' => 'castano',
+        'tono_piel' => 'medio_claro',
+        'lentes' => false,
+    ];
 
     /**
      * Normaliza un RUT chileno: sin puntos, guion ni espacios y con K en mayúscula.
@@ -116,6 +135,40 @@ class Chofer extends Model
     }
 
     /**
+     * Devuelve la configuración de avatar con valores por defecto seguros
+     * cuando el chofer aún no lo ha personalizado.
+     *
+     * @return array{peinado: string, color_pelo: string, tono_piel: string, lentes: bool}
+     */
+    public function avatarResuelto(): array
+    {
+        $raw = is_array($this->avatar_config) ? $this->avatar_config : [];
+
+        $peinado = is_string($raw['peinado'] ?? null) && in_array($raw['peinado'], self::AVATAR_PEINADOS, true)
+            ? $raw['peinado']
+            : self::AVATAR_DEFAULT['peinado'];
+
+        $colorPelo = is_string($raw['color_pelo'] ?? null) && in_array($raw['color_pelo'], self::AVATAR_COLORES_PELO, true)
+            ? $raw['color_pelo']
+            : self::AVATAR_DEFAULT['color_pelo'];
+
+        $tonoPiel = is_string($raw['tono_piel'] ?? null) && in_array($raw['tono_piel'], self::AVATAR_TONOS_PIEL, true)
+            ? $raw['tono_piel']
+            : self::AVATAR_DEFAULT['tono_piel'];
+
+        $lentes = is_bool($raw['lentes'] ?? null)
+            ? $raw['lentes']
+            : self::AVATAR_DEFAULT['lentes'];
+
+        return [
+            'peinado' => $peinado,
+            'color_pelo' => $colorPelo,
+            'tono_piel' => $tonoPiel,
+            'lentes' => $lentes,
+        ];
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -131,6 +184,7 @@ class Chofer extends Model
             'licencia_borrado_habilitado' => 'boolean',
             'desactivado_en' => 'datetime',
             'ciclo_desactivacion' => 'integer',
+            'avatar_config' => 'array',
         ];
     }
 
