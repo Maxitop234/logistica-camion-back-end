@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AuditLog;
 use App\Models\Camion;
 use App\Models\Chofer;
 use App\Models\User;
@@ -91,4 +92,39 @@ test('no se puede desactivar un camion en ruta', function () {
     $this->actingAs($this->admin, 'sanctum')->deleteJson("/api/v1/camiones/{$camion->id}")->assertStatus(409);
 
     expect($camion->fresh()->estado_operativo)->toBe('en_ruta');
+});
+
+test('desactivar un camion guarda motivo y auditoria y reactivar los limpia y audita', function () {
+    $camion = Camion::factory()->create(['chofer_actual_id' => Chofer::factory()->create()->id]);
+
+    // Motivo muy corto rechazado con 422.
+    $this->actingAs($this->admin, 'sanctum')
+        ->deleteJson("/api/v1/camiones/{$camion->id}", ['motivo' => 'abc'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['motivo']);
+
+    // Baja con motivo válido.
+    $this->actingAs($this->admin, 'sanctum')
+        ->deleteJson("/api/v1/camiones/{$camion->id}", ['motivo' => 'Falla mecánica grave / siniestro'])
+        ->assertNoContent();
+
+    $this->actingAs($this->admin, 'sanctum')
+        ->getJson("/api/v1/camiones/{$camion->id}")
+        ->assertOk()
+        ->assertJsonPath('data.estado_operativo', 'inactivo')
+        ->assertJsonPath('data.motivo_desactivacion', 'Falla mecánica grave / siniestro');
+
+    expect($camion->fresh()->desactivado_en)->not->toBeNull()
+        ->and($camion->fresh()->desactivado_por_user_id)->toBe($this->admin->id)
+        ->and(AuditLog::where('accion', 'camion_desactivado')->where('user_id', $this->admin->id)->exists())->toBeTrue();
+
+    // Reactivación limpia motivo y audita.
+    $this->actingAs($this->admin, 'sanctum')
+        ->putJson("/api/v1/camiones/{$camion->id}", ['estado_operativo' => 'disponible'])
+        ->assertOk()
+        ->assertJsonPath('data.estado_operativo', 'disponible')
+        ->assertJsonPath('data.motivo_desactivacion', null)
+        ->assertJsonPath('data.desactivado_en', null);
+
+    expect(AuditLog::where('accion', 'camion_reactivado')->where('user_id', $this->admin->id)->exists())->toBeTrue();
 });

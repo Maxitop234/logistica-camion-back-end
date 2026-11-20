@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CamionController;
 use App\Http\Controllers\Api\V1\ChoferController;
 use App\Http\Controllers\Api\V1\LicenciaChoferController;
+use App\Http\Controllers\Api\V1\NotificacionChoferController;
 use App\Http\Controllers\Api\V1\NotificacionLicenciaController;
 use App\Http\Controllers\Api\V1\ReactivacionChoferController;
 use App\Http\Controllers\Api\V1\RutaController;
@@ -28,6 +29,9 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', 'active:permitir_chofer_inactivo', 'role:chofer'])->prefix('chofer')->group(function () {
         Route::get('estado-cuenta', [ReactivacionChoferController::class, 'estadoCuenta']);
         Route::post('solicitud-reactivacion', [ReactivacionChoferController::class, 'solicitar']);
+        Route::get('notificaciones', [NotificacionChoferController::class, 'index']);
+        Route::post('notificaciones/leer-todas', [NotificacionChoferController::class, 'marcarTodasLeidas']);
+        Route::post('notificaciones/{notificacion}/leer', [NotificacionChoferController::class, 'marcarLeida']);
     });
 
     // Endpoints operativos del chofer (bloqueados con 403 si está inactivo, sin revocar token).
@@ -57,6 +61,7 @@ Route::prefix('v1')->group(function () {
 
         Route::get('choferes/{chofer}/licencia/archivo', [LicenciaChoferController::class, 'archivoPorAdmin']);
         Route::post('choferes/{chofer}/licencia/verificar', [LicenciaChoferController::class, 'verificar']);
+        Route::post('choferes/{chofer}/licencia/desverificar', [LicenciaChoferController::class, 'desverificar']);
         Route::delete('choferes/{chofer}/licencia', [LicenciaChoferController::class, 'destrabarPorAdmin']);
 
         Route::get('notificaciones/licencias', [NotificacionLicenciaController::class, 'index']);

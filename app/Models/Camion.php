@@ -19,6 +19,9 @@ use Illuminate\Support\Carbon;
  * @property string $capacidad_kg
  * @property string $estado_operativo
  * @property int|null $chofer_actual_id
+ * @property string|null $motivo_desactivacion
+ * @property Carbon|null $desactivado_en
+ * @property int|null $desactivado_por_user_id
  * @property string|null $ultima_latitud
  * @property string|null $ultima_longitud
  * @property string $velocidad_actual_kmh
@@ -29,6 +32,7 @@ use Illuminate\Support\Carbon;
 #[Table('camiones')]
 #[Fillable([
     'patente', 'marca', 'modelo', 'anio', 'capacidad_kg', 'estado_operativo', 'chofer_actual_id',
+    'motivo_desactivacion', 'desactivado_en', 'desactivado_por_user_id',
     'ultima_latitud', 'ultima_longitud', 'velocidad_actual_kmh', 'ultima_actualizacion_gps',
 ])]
 class Camion extends Model
@@ -46,6 +50,7 @@ class Camion extends Model
         return [
             'anio' => 'integer',
             'capacidad_kg' => 'decimal:2',
+            'desactivado_en' => 'datetime',
             'ultima_latitud' => 'decimal:7',
             'ultima_longitud' => 'decimal:7',
             'velocidad_actual_kmh' => 'decimal:2',
@@ -59,5 +64,13 @@ class Camion extends Model
     public function choferActual(): BelongsTo
     {
         return $this->belongsTo(Chofer::class, 'chofer_actual_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function desactivadoPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'desactivado_por_user_id');
     }
 }

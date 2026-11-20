@@ -24,6 +24,8 @@ class CamionResource extends JsonResource
             'anio' => $this->anio,
             'capacidad_kg' => $this->capacidad_kg,
             'estado_operativo' => $this->estado_operativo,
+            'motivo_desactivacion' => $this->motivo_desactivacion,
+            'desactivado_en' => $this->desactivado_en?->toIso8601String(),
             'chofer_actual' => $this->whenLoaded('choferActual', fn () => $this->choferActual ? [
                 'id' => $this->choferActual->id,
                 'nombre' => $this->choferActual->nombre_cifrado,

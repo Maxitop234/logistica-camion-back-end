@@ -10,6 +10,7 @@ use App\Http\Requests\Chofer\UpdateChoferRequest;
 use App\Http\Resources\ChoferResource;
 use App\Models\AuditLog;
 use App\Models\Chofer;
+use App\Models\NotificacionChofer;
 use App\Models\SolicitudReactivacionChofer;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -148,6 +149,13 @@ class ChoferController extends Controller
                 'ciclo_desactivacion' => (int) $chofer->ciclo_desactivacion,
                 'origen' => 'manual',
             ]);
+
+            NotificacionChofer::crear(
+                $chofer,
+                NotificacionChofer::TIPO_CUENTA_REACTIVADA,
+                'Cuenta reactivada',
+                'Tu cuenta fue reactivada por el administrador. Ya puedes volver a operar normalmente en la aplicación.',
+            );
         });
 
         return new ChoferResource($chofer->fresh()->load(self::RELACIONES));

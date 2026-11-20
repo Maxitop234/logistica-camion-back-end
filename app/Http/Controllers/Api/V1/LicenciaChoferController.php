@@ -10,6 +10,7 @@ use App\Http\Resources\LicenciaChoferResource;
 use App\Http\Resources\SolicitudBorradoLicenciaResource;
 use App\Models\AuditLog;
 use App\Models\Chofer;
+use App\Models\NotificacionChofer;
 use App\Models\SolicitudBorradoLicencia;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -236,6 +237,52 @@ class LicenciaChoferController extends Controller
                 'chofer_id' => $chofer->id,
                 'sha256' => $chofer->licencia_archivo_sha256,
             ]);
+
+            NotificacionChofer::crear(
+                $chofer,
+                NotificacionChofer::TIPO_LICENCIA_VERIFICADA,
+                'Licencia verificada',
+                'Tu Hoja de Vida del Conductor fue verificada por el administrador.',
+            );
+        });
+
+        return new ChoferResource($chofer->fresh()->load([
+            'user',
+            'camionActual',
+            ...self::RELACIONES_LICENCIA,
+        ]));
+    }
+
+    /**
+     * Quita la verificación de una licencia ya verificada sin eliminar el PDF cargado.
+     */
+    public function desverificar(Request $request, Chofer $chofer): ChoferResource|JsonResponse
+    {
+        if ($chofer->licencia_estado !== Chofer::LICENCIA_VERIFICADA) {
+            return response()->json([
+                'message' => 'La licencia de este chofer no se encuentra verificada.',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($chofer, $request): void {
+            $chofer->update([
+                'licencia_estado' => Chofer::LICENCIA_PENDIENTE,
+                'licencia_verificada_por_user_id' => null,
+                'licencia_verificada_en' => null,
+            ]);
+
+            AuditLog::registrar('licencia_desverificada', $request->user(), $request, [
+                'chofer_id' => $chofer->id,
+                'archivo_nombre' => $chofer->licencia_archivo_nombre,
+                'sha256' => $chofer->licencia_archivo_sha256,
+            ]);
+
+            NotificacionChofer::crear(
+                $chofer,
+                NotificacionChofer::TIPO_LICENCIA_DESVERIFICADA,
+                'Verificación de licencia removida',
+                'El administrador quitó la verificación de tu licencia. Tu documento PDF se conserva pendiente de revisión.',
+            );
         });
 
         return new ChoferResource($chofer->fresh()->load([
@@ -285,6 +332,13 @@ class LicenciaChoferController extends Controller
                 'estado_anterior' => $estadoAnterior,
                 'sha256_anterior' => $shaAnterior,
             ]);
+
+            NotificacionChofer::crear(
+                $chofer,
+                NotificacionChofer::TIPO_LICENCIA_DESTRABADA,
+                'Licencia destrabada',
+                'El administrador eliminó el PDF anterior de tu licencia. Ya puedes subir un nuevo documento.',
+            );
         });
 
         if (is_string($rutaAnterior) && Storage::disk('local')->exists($rutaAnterior)) {

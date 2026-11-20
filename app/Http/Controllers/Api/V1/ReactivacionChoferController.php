@@ -8,6 +8,7 @@ use App\Http\Requests\Chofer\StoreSolicitudReactivacionRequest;
 use App\Http\Resources\SolicitudReactivacionChoferResource;
 use App\Models\AuditLog;
 use App\Models\Chofer;
+use App\Models\NotificacionChofer;
 use App\Models\SolicitudReactivacionChofer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -163,6 +164,13 @@ class ReactivacionChoferController extends Controller
                 'chofer_id' => $chofer->id,
                 'ciclo_desactivacion' => $solicitud->ciclo_desactivacion,
             ]);
+
+            NotificacionChofer::crear(
+                $chofer,
+                NotificacionChofer::TIPO_CUENTA_REACTIVADA,
+                'Solicitud de reactivación aprobada',
+                'Tu solicitud de reactivación fue aprobada. Tu cuenta se encuentra activa nuevamente.',
+            );
         });
 
         return new SolicitudReactivacionChoferResource(
@@ -195,6 +203,13 @@ class ReactivacionChoferController extends Controller
                 'ciclo_desactivacion' => $solicitud->ciclo_desactivacion,
                 'motivo_rechazo' => $motivoRechazo,
             ]);
+
+            NotificacionChofer::crear(
+                $solicitud->chofer_id,
+                NotificacionChofer::TIPO_REACTIVACION_RECHAZADA,
+                'Solicitud de reactivación rechazada',
+                "Tu solicitud de reactivación fue rechazada. Motivo: {$motivoRechazo}",
+            );
         });
 
         return new SolicitudReactivacionChoferResource(

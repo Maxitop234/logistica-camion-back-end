@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Licencia\RechazarSolicitudBorradoRequest;
+use App\Http\Resources\ChoferResource;
 use App\Http\Resources\SolicitudBorradoLicenciaResource;
 use App\Models\AuditLog;
+use App\Models\Chofer;
+use App\Models\NotificacionChofer;
 use App\Models\SolicitudBorradoLicencia;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,7 +18,8 @@ use Illuminate\Support\Facades\DB;
 class NotificacionLicenciaController extends Controller
 {
     /**
-     * Lista las solicitudes de borrado de licencia (pendientes primero) con el conteo de pendientes.
+     * Lista las solicitudes de borrado de licencia (pendientes primero) y los
+     * choferes con PDF cargado pendiente de revisión por el administrador.
      */
     public function index(): AnonymousResourceCollection
     {
@@ -28,9 +32,26 @@ class NotificacionLicenciaController extends Controller
             ->where('estado', SolicitudBorradoLicencia::ESTADO_PENDIENTE)
             ->count();
 
+        $pendientesRevision = Chofer::with([
+            'user',
+            'camionActual',
+            ...LicenciaChoferController::RELACIONES_LICENCIA,
+            'ultimaSolicitudReactivacion.resueltaPor.administrador',
+        ])
+            ->where('licencia_estado', Chofer::LICENCIA_PENDIENTE)
+            ->whereNotNull('licencia_archivo_path')
+            ->where('licencia_archivo_path', '!=', '')
+            ->orderByDesc('licencia_subida_en')
+            ->get();
+
+        $pendientesRevisionCount = $pendientesRevision->count();
+
         return SolicitudBorradoLicenciaResource::collection($solicitudes)->additional([
+            'pendientes_revision' => ChoferResource::collection($pendientesRevision)->resolve(),
             'meta' => [
                 'pendientes_count' => $pendientes,
+                'pendientes_revision_count' => $pendientesRevisionCount,
+                'total_pendientes_count' => $pendientes + $pendientesRevisionCount,
             ],
         ]);
     }
@@ -59,6 +80,13 @@ class NotificacionLicenciaController extends Controller
                 'solicitud_id' => $solicitud->id,
                 'chofer_id' => $solicitud->chofer_id,
             ]);
+
+            NotificacionChofer::crear(
+                $solicitud->chofer_id,
+                NotificacionChofer::TIPO_BORRADO_APROBADO,
+                'Borrado de PDF habilitado',
+                'El administrador aprobó tu solicitud. Ya puedes eliminar tu PDF actual y subir un nuevo documento.',
+            );
         });
 
         return new SolicitudBorradoLicenciaResource(
@@ -90,6 +118,17 @@ class NotificacionLicenciaController extends Controller
                 'chofer_id' => $solicitud->chofer_id,
                 'respuesta_admin' => $respuesta,
             ]);
+
+            $mensaje = is_string($respuesta) && $respuesta !== ''
+                ? "El administrador rechazó tu solicitud para borrar el PDF. Observación: {$respuesta}"
+                : 'El administrador rechazó tu solicitud para borrar el PDF. Tu documento actual sigue bloqueado.';
+
+            NotificacionChofer::crear(
+                $solicitud->chofer_id,
+                NotificacionChofer::TIPO_BORRADO_RECHAZADO,
+                'Solicitud de borrado rechazada',
+                $mensaje,
+            );
         });
 
         return new SolicitudBorradoLicenciaResource(
