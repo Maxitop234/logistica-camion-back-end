@@ -3,11 +3,14 @@
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CamionController;
 use App\Http\Controllers\Api\V1\ChoferController;
+use App\Http\Controllers\Api\V1\IotLecturaController;
 use App\Http\Controllers\Api\V1\LicenciaChoferController;
 use App\Http\Controllers\Api\V1\NotificacionChoferController;
 use App\Http\Controllers\Api\V1\NotificacionLicenciaController;
+use App\Http\Controllers\Api\V1\PuntoController;
 use App\Http\Controllers\Api\V1\ReactivacionChoferController;
 use App\Http\Controllers\Api\V1\RutaController;
+use App\Http\Controllers\Api\V1\SolicitudPuntoController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -24,6 +27,10 @@ Route::prefix('v1')->group(function () {
             Route::get('me', [AuthController::class, 'me']);
         });
     });
+
+    // Ingesta IoT desde hardware ESP32 autenticado por token de sensor (sin cuenta humana).
+    Route::post('iot/lecturas', [IotLecturaController::class, 'store'])
+        ->middleware('throttle:120,1');
 
     // Endpoints restringidos permitidos a un chofer incluso si su cuenta está desactivada.
     Route::middleware(['auth:sanctum', 'active:permitir_chofer_inactivo', 'role:chofer'])->prefix('chofer')->group(function () {
@@ -43,6 +50,8 @@ Route::prefix('v1')->group(function () {
             Route::post('licencia/solicitud-borrado', [LicenciaChoferController::class, 'solicitarBorrado']);
             Route::delete('licencia', [LicenciaChoferController::class, 'eliminarPropia']);
             Route::put('avatar', [ChoferController::class, 'actualizarAvatar']);
+            Route::get('puntos', [PuntoController::class, 'indexChofer']);
+            Route::post('solicitudes-punto', [SolicitudPuntoController::class, 'store']);
             Route::get('ruta-activa', [RutaController::class, 'rutaActiva']);
         });
 
@@ -55,6 +64,11 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('camiones', CamionController::class)->parameters(['camiones' => 'camion']);
         Route::apiResource('choferes', ChoferController::class)->parameters(['choferes' => 'chofer']);
         Route::post('choferes/{chofer}/reactivar', [ChoferController::class, 'reactivar']);
+
+        Route::apiResource('puntos', PuntoController::class)->parameters(['puntos' => 'punto']);
+        Route::post('puntos/{punto}/reactivar', [PuntoController::class, 'reactivar']);
+        Route::post('puntos/{punto}/sensor-token', [PuntoController::class, 'generarTokenSensor']);
+        Route::post('puntos/{punto}/simular-lectura', [PuntoController::class, 'simularLecturaIot']);
 
         Route::get('rutas', [RutaController::class, 'index']);
         Route::post('rutas/generar', [RutaController::class, 'generar']);
@@ -72,5 +86,9 @@ Route::prefix('v1')->group(function () {
         Route::get('notificaciones/reactivaciones', [ReactivacionChoferController::class, 'listarNotificaciones']);
         Route::post('notificaciones/reactivaciones/{solicitud}/aprobar', [ReactivacionChoferController::class, 'aprobar']);
         Route::post('notificaciones/reactivaciones/{solicitud}/rechazar', [ReactivacionChoferController::class, 'rechazar']);
+
+        Route::get('notificaciones/puntos', [SolicitudPuntoController::class, 'index']);
+        Route::post('notificaciones/puntos/{solicitud}/aprobar', [SolicitudPuntoController::class, 'aprobar']);
+        Route::post('notificaciones/puntos/{solicitud}/rechazar', [SolicitudPuntoController::class, 'rechazar']);
     });
 });

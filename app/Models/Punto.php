@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -21,6 +22,12 @@ use Illuminate\Support\Carbon;
  * @property int $porcentaje_llenado
  * @property string|null $peso_actual_kg
  * @property Carbon|null $ultima_actualizacion_estado
+ * @property string $origen_actualizacion
+ * @property string $altura_contenedor_cm
+ * @property string|null $sensor_codigo
+ * @property string|null $sensor_token_hash
+ * @property string|null $bateria_voltaje
+ * @property Carbon|null $ultimo_heartbeat_iot
  * @property bool $activo
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -36,12 +43,31 @@ use Illuminate\Support\Carbon;
     'porcentaje_llenado',
     'peso_actual_kg',
     'ultima_actualizacion_estado',
+    'origen_actualizacion',
+    'altura_contenedor_cm',
+    'sensor_codigo',
+    'sensor_token_hash',
+    'bateria_voltaje',
+    'ultimo_heartbeat_iot',
     'activo',
 ])]
 class Punto extends Model
 {
     /** @use HasFactory<PuntoFactory> */
     use HasFactory;
+
+    public const TIPO_CONDOMINIO = 'condominio';
+
+    public const TIPO_CALLE = 'calle';
+
+    /** @var array<int, string> */
+    public const TIPOS_VALIDOS = [self::TIPO_CONDOMINIO, self::TIPO_CALLE];
+
+    public const ORIGEN_MANUAL = 'manual';
+
+    public const ORIGEN_CHOFER = 'chofer';
+
+    public const ORIGEN_SENSOR_IOT = 'sensor_iot';
 
     public const ESTADO_VACIO = 'vacio';
 
@@ -53,10 +79,45 @@ class Punto extends Model
 
     public const ESTADO_LLENO = 'lleno';
 
-    /**
-     * @var array<int, string>
-     */
+    /** @var array<int, string> */
     public const ESTADOS_LISTOS = [self::ESTADO_ALTO, self::ESTADO_LLENO];
+
+    /**
+     * Clasifica el porcentaje (0-100) en estado de llenado consistente con el FE:
+     * 0-10 vacio, 11-40 bajo, 41-70 medio, 71-89 alto, 90-100 lleno.
+     */
+    public static function clasificarEstado(int $porcentaje): string
+    {
+        $p = max(0, min(100, $porcentaje));
+
+        return match (true) {
+            $p <= 10 => self::ESTADO_VACIO,
+            $p <= 40 => self::ESTADO_BAJO,
+            $p <= 70 => self::ESTADO_MEDIO,
+            $p <= 89 => self::ESTADO_ALTO,
+            default => self::ESTADO_LLENO,
+        };
+    }
+
+    /**
+     * Calcula el porcentaje de llenado desde una distancia medida por sensor
+     * ultrasónico (JSN-SR04T / HC-SR04) y la altura calibrada del contenedor.
+     */
+    public static function porcentajeDesdeDistancia(float $distanciaCm, float $alturaContenedorCm): int
+    {
+        if ($alturaContenedorCm <= 0) {
+            return 0;
+        }
+
+        $calculado = (($alturaContenedorCm - $distanciaCm) / $alturaContenedorCm) * 100;
+
+        return max(0, min(100, (int) round($calculado)));
+    }
+
+    public static function hashSensorToken(string $token): string
+    {
+        return hash('sha256', trim($token));
+    }
 
     /**
      * @return array<string, string>
@@ -65,7 +126,10 @@ class Punto extends Model
     {
         return [
             'porcentaje_llenado' => 'integer',
+            'altura_contenedor_cm' => 'decimal:2',
+            'bateria_voltaje' => 'decimal:2',
             'ultima_actualizacion_estado' => 'datetime',
+            'ultimo_heartbeat_iot' => 'datetime',
             'activo' => 'boolean',
         ];
     }
@@ -82,5 +146,19 @@ class Punto extends Model
     public function listoParaRecolectar(): bool
     {
         return $this->activo && in_array($this->estado_llenado, self::ESTADOS_LISTOS, true);
+    }
+
+    public function tieneSensorVinculado(): bool
+    {
+        return (is_string($this->sensor_token_hash) && $this->sensor_token_hash !== '')
+            || (is_string($this->sensor_codigo) && $this->sensor_codigo !== '');
+    }
+
+    /**
+     * @return HasMany<LecturaPunto, $this>
+     */
+    public function lecturas(): HasMany
+    {
+        return $this->hasMany(LecturaPunto::class)->orderByDesc('medido_en')->orderByDesc('id');
     }
 }

@@ -44,6 +44,10 @@ class NotificacionChofer extends Model
 
     public const TIPO_REACTIVACION_RECHAZADA = 'reactivacion_rechazada';
 
+    public const TIPO_PUNTO_APROBADO = 'punto_aprobado';
+
+    public const TIPO_PUNTO_RECHAZADO = 'punto_rechazado';
+
     /**
      * Registra una notificación persistida para el chofer indicado.
      */
