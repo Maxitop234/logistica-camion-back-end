@@ -20,6 +20,7 @@ class UserResource extends JsonResource
         $chofer = $this->role === 'chofer'
             ? $this->chofer()->with([
                 'licenciaVerificadaPor.administrador',
+                'licenciaRechazadaPor.administrador',
                 'ultimaSolicitudBorrado.resueltaPor.administrador',
                 'ultimaSolicitudReactivacion.resueltaPor.administrador',
             ])->first()

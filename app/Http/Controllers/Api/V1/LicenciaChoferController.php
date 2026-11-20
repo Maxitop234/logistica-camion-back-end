@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Licencia\RechazarLicenciaChoferRequest;
 use App\Http\Requests\Licencia\StoreSolicitudBorradoLicenciaRequest;
 use App\Http\Requests\Licencia\UploadLicenciaChoferRequest;
 use App\Http\Resources\ChoferResource;
@@ -28,6 +29,7 @@ class LicenciaChoferController extends Controller
      */
     public const RELACIONES_LICENCIA = [
         'licenciaVerificadaPor.administrador',
+        'licenciaRechazadaPor.administrador',
         'ultimaSolicitudBorrado.resueltaPor.administrador',
     ];
 
@@ -80,6 +82,9 @@ class LicenciaChoferController extends Controller
                 'licencia_verificada_por_user_id' => null,
                 'licencia_verificada_en' => null,
                 'licencia_borrado_habilitado' => false,
+                'licencia_motivo_rechazo' => null,
+                'licencia_rechazada_por_user_id' => null,
+                'licencia_rechazada_en' => null,
             ]);
 
             AuditLog::registrar('licencia_subida', $request->user(), $request, [
@@ -231,6 +236,9 @@ class LicenciaChoferController extends Controller
                 'licencia_verificada_por_user_id' => $request->user()->id,
                 'licencia_verificada_en' => now(),
                 'licencia_borrado_habilitado' => false,
+                'licencia_motivo_rechazo' => null,
+                'licencia_rechazada_por_user_id' => null,
+                'licencia_rechazada_en' => null,
             ]);
 
             AuditLog::registrar('licencia_verificada', $request->user(), $request, [
@@ -293,6 +301,78 @@ class LicenciaChoferController extends Controller
     }
 
     /**
+     * Rechaza el PDF en revisión de un chofer con motivo obligatorio, elimina el
+     * archivo para permitir una nueva subida, registra auditoría y notifica.
+     */
+    public function rechazar(RechazarLicenciaChoferRequest $request, Chofer $chofer): ChoferResource|JsonResponse
+    {
+        if ($chofer->licencia_estado === Chofer::LICENCIA_VERIFICADA) {
+            return response()->json([
+                'message' => 'No se puede rechazar una licencia verificada. Quita primero la verificación.',
+            ], 422);
+        }
+
+        if (! $chofer->tieneArchivoLicencia()) {
+            return response()->json([
+                'message' => 'No existe un documento PDF en revisión para rechazar.',
+            ], 422);
+        }
+
+        $motivo = (string) $request->validated('motivo');
+        $rutaAnterior = $chofer->licencia_archivo_path;
+        $nombreAnterior = $chofer->licencia_archivo_nombre;
+        $shaAnterior = $chofer->licencia_archivo_sha256;
+
+        DB::transaction(function () use ($chofer, $motivo, $nombreAnterior, $shaAnterior, $request): void {
+            $chofer->update([
+                'licencia_estado' => Chofer::LICENCIA_RECHAZADA,
+                'licencia_archivo_path' => null,
+                'licencia_archivo_nombre' => null,
+                'licencia_archivo_sha256' => null,
+                'licencia_subida_en' => null,
+                'licencia_verificada_por_user_id' => null,
+                'licencia_verificada_en' => null,
+                'licencia_borrado_habilitado' => false,
+                'licencia_motivo_rechazo' => $motivo,
+                'licencia_rechazada_por_user_id' => $request->user()->id,
+                'licencia_rechazada_en' => now(),
+            ]);
+
+            $chofer->solicitudesBorradoLicencia()
+                ->where('estado', SolicitudBorradoLicencia::ESTADO_PENDIENTE)
+                ->update([
+                    'estado' => SolicitudBorradoLicencia::ESTADO_APROBADA,
+                    'resuelta_por_user_id' => $request->user()->id,
+                    'resuelta_en' => now(),
+                ]);
+
+            AuditLog::registrar('licencia_rechazada', $request->user(), $request, [
+                'chofer_id' => $chofer->id,
+                'motivo' => $motivo,
+                'archivo_nombre_anterior' => $nombreAnterior,
+                'sha256_anterior' => $shaAnterior,
+            ]);
+
+            NotificacionChofer::crear(
+                $chofer,
+                NotificacionChofer::TIPO_LICENCIA_RECHAZADA,
+                'Licencia rechazada',
+                "El administrador rechazó tu documento de licencia. Motivo: {$motivo}. Sube un nuevo PDF corregido.",
+            );
+        });
+
+        if (is_string($rutaAnterior) && Storage::disk('local')->exists($rutaAnterior)) {
+            Storage::disk('local')->delete($rutaAnterior);
+        }
+
+        return new ChoferResource($chofer->fresh()->load([
+            'user',
+            'camionActual',
+            ...self::RELACIONES_LICENCIA,
+        ]));
+    }
+
+    /**
      * Destraba y elimina el documento de un chofer (pendiente o ya verificada) devolviéndolo a pendiente sin archivo.
      */
     public function destrabarPorAdmin(Request $request, Chofer $chofer): ChoferResource|JsonResponse
@@ -317,6 +397,9 @@ class LicenciaChoferController extends Controller
                 'licencia_verificada_por_user_id' => null,
                 'licencia_verificada_en' => null,
                 'licencia_borrado_habilitado' => false,
+                'licencia_motivo_rechazo' => null,
+                'licencia_rechazada_por_user_id' => null,
+                'licencia_rechazada_en' => null,
             ]);
 
             $chofer->solicitudesBorradoLicencia()

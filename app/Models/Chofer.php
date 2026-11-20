@@ -28,6 +28,9 @@ use Illuminate\Support\Carbon;
  * @property int|null $licencia_verificada_por_user_id
  * @property Carbon|null $licencia_verificada_en
  * @property bool $licencia_borrado_habilitado
+ * @property string|null $licencia_motivo_rechazo
+ * @property int|null $licencia_rechazada_por_user_id
+ * @property Carbon|null $licencia_rechazada_en
  * @property string|null $motivo_desactivacion
  * @property Carbon|null $desactivado_en
  * @property int|null $desactivado_por_user_id
@@ -52,6 +55,9 @@ use Illuminate\Support\Carbon;
     'licencia_verificada_por_user_id',
     'licencia_verificada_en',
     'licencia_borrado_habilitado',
+    'licencia_motivo_rechazo',
+    'licencia_rechazada_por_user_id',
+    'licencia_rechazada_en',
     'motivo_desactivacion',
     'desactivado_en',
     'desactivado_por_user_id',
@@ -66,6 +72,8 @@ class Chofer extends Model
     public const LICENCIA_PENDIENTE = 'pendiente';
 
     public const LICENCIA_VERIFICADA = 'verificada';
+
+    public const LICENCIA_RECHAZADA = 'rechazada';
 
     /** @var array<int, string> */
     public const AVATAR_PEINADOS = ['corto', 'largo', 'ondas', 'mono', 'rizado', 'rapado'];
@@ -182,6 +190,7 @@ class Chofer extends Model
             'licencia_subida_en' => 'datetime',
             'licencia_verificada_en' => 'datetime',
             'licencia_borrado_habilitado' => 'boolean',
+            'licencia_rechazada_en' => 'datetime',
             'desactivado_en' => 'datetime',
             'ciclo_desactivacion' => 'integer',
             'avatar_config' => 'array',
@@ -210,6 +219,14 @@ class Chofer extends Model
     public function licenciaVerificadaPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'licencia_verificada_por_user_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function licenciaRechazadaPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'licencia_rechazada_por_user_id');
     }
 
     /**

@@ -62,6 +62,7 @@ Route::prefix('v1')->group(function () {
         Route::get('choferes/{chofer}/licencia/archivo', [LicenciaChoferController::class, 'archivoPorAdmin']);
         Route::post('choferes/{chofer}/licencia/verificar', [LicenciaChoferController::class, 'verificar']);
         Route::post('choferes/{chofer}/licencia/desverificar', [LicenciaChoferController::class, 'desverificar']);
+        Route::post('choferes/{chofer}/licencia/rechazar', [LicenciaChoferController::class, 'rechazar']);
         Route::delete('choferes/{chofer}/licencia', [LicenciaChoferController::class, 'destrabarPorAdmin']);
 
         Route::get('notificaciones/licencias', [NotificacionLicenciaController::class, 'index']);

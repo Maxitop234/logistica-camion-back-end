@@ -157,3 +157,79 @@ test('acciones del admin sobre borrado de PDF y reactivacion generan notificacio
     expect($tipos)->toContain(NotificacionChofer::TIPO_BORRADO_APROBADO)
         ->and($tipos)->toContain(NotificacionChofer::TIPO_CUENTA_REACTIVADA);
 });
+
+test('admin rechaza licencia en revision con motivo, elimina pdf, audita, notifica y chofer puede resubir', function () {
+    // Sin PDF no se puede rechazar.
+    $this->actingAs($this->admin, 'sanctum')
+        ->postJson("/api/v1/choferes/{$this->chofer->id}/licencia/rechazar", [
+            'motivo' => 'El documento no corresponde a la Hoja de Vida.',
+        ])
+        ->assertUnprocessable();
+
+    // Chofer sube PDF inicial.
+    $this->actingAs($this->choferUser, 'sanctum')
+        ->post('/api/v1/chofer/licencia', ['archivo' => pdfPruebaNotif('equivocado.pdf')], ['Accept' => 'application/json'])
+        ->assertCreated();
+
+    $rutaInicial = $this->chofer->fresh()->licencia_archivo_path;
+
+    // Motivo obligatorio y mínimo 5 caracteres.
+    $this->actingAs($this->admin, 'sanctum')
+        ->postJson("/api/v1/choferes/{$this->chofer->id}/licencia/rechazar", ['motivo' => 'mal'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['motivo']);
+
+    // Rechazo válido: elimina archivo, pasa a rechazada, guarda motivo/quién/cuándo, audita y notifica.
+    $motivo = 'El documento no es la Hoja de Vida del Conductor';
+    $this->actingAs($this->admin, 'sanctum')
+        ->postJson("/api/v1/choferes/{$this->chofer->id}/licencia/rechazar", ['motivo' => $motivo])
+        ->assertOk()
+        ->assertJsonPath('data.licencia.estado', 'rechazada')
+        ->assertJsonPath('data.licencia.tiene_archivo', false)
+        ->assertJsonPath('data.licencia.puede_subir', true)
+        ->assertJsonPath('data.licencia.motivo_rechazo', $motivo)
+        ->assertJsonPath('data.licencia.rechazada_por.nombre', 'María Administradora');
+
+    Storage::disk('local')->assertMissing($rutaInicial);
+    expect($this->chofer->fresh()->licencia_rechazada_en)->not->toBeNull();
+    expect(AuditLog::where('accion', 'licencia_rechazada')->where('user_id', $this->admin->id)->exists())->toBeTrue();
+
+    // Sale de pendientes de revisión del admin.
+    $this->actingAs($this->admin, 'sanctum')
+        ->getJson('/api/v1/notificaciones/licencias')
+        ->assertOk()
+        ->assertJsonPath('meta.pendientes_revision_count', 0);
+
+    // El chofer recibe notificación y ve el estado rechazada con su motivo.
+    $this->actingAs($this->choferUser, 'sanctum')
+        ->getJson('/api/v1/chofer/notificaciones')
+        ->assertOk()
+        ->assertJsonPath('data.0.tipo', NotificacionChofer::TIPO_LICENCIA_RECHAZADA);
+
+    $this->actingAs($this->choferUser, 'sanctum')
+        ->getJson('/api/v1/chofer/licencia')
+        ->assertOk()
+        ->assertJsonPath('data.estado', 'rechazada')
+        ->assertJsonPath('data.motivo_rechazo', $motivo)
+        ->assertJsonPath('data.puede_subir', true);
+
+    // Re-subida tras rechazo (sin 409): vuelve a pendiente (En revisión) y limpia campos de rechazo.
+    $this->actingAs($this->choferUser, 'sanctum')
+        ->post('/api/v1/chofer/licencia', ['archivo' => pdfPruebaNotif('hoja_correcta.pdf')], ['Accept' => 'application/json'])
+        ->assertCreated()
+        ->assertJsonPath('data.estado', 'pendiente')
+        ->assertJsonPath('data.tiene_archivo', true)
+        ->assertJsonPath('data.borrado_habilitado', false)
+        ->assertJsonPath('data.motivo_rechazo', null)
+        ->assertJsonPath('data.rechazada_en', null)
+        ->assertJsonPath('data.rechazada_por', null);
+
+    // No se puede rechazar una licencia ya verificada.
+    $this->actingAs($this->admin, 'sanctum')
+        ->postJson("/api/v1/choferes/{$this->chofer->id}/licencia/verificar")
+        ->assertOk();
+
+    $this->actingAs($this->admin, 'sanctum')
+        ->postJson("/api/v1/choferes/{$this->chofer->id}/licencia/rechazar", ['motivo' => $motivo])
+        ->assertUnprocessable();
+});

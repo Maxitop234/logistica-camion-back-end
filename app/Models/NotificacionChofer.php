@@ -32,6 +32,8 @@ class NotificacionChofer extends Model
 
     public const TIPO_LICENCIA_DESVERIFICADA = 'licencia_desverificada';
 
+    public const TIPO_LICENCIA_RECHAZADA = 'licencia_rechazada';
+
     public const TIPO_LICENCIA_DESTRABADA = 'licencia_destrabada';
 
     public const TIPO_BORRADO_APROBADO = 'borrado_aprobado';

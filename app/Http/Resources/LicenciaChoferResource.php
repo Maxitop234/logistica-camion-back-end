@@ -22,6 +22,9 @@ class LicenciaChoferResource extends JsonResource
         $verificador = $chofer->relationLoaded('licenciaVerificadaPor')
             ? $chofer->licenciaVerificadaPor
             : null;
+        $rechazador = $chofer->relationLoaded('licenciaRechazadaPor')
+            ? $chofer->licenciaRechazadaPor
+            : null;
         $ultimaSolicitud = $chofer->relationLoaded('ultimaSolicitudBorrado')
             ? $chofer->ultimaSolicitudBorrado
             : null;
@@ -33,6 +36,9 @@ class LicenciaChoferResource extends JsonResource
             'subida_en' => $chofer->licencia_subida_en?->toIso8601String(),
             'verificada_en' => $chofer->licencia_verificada_en?->toIso8601String(),
             'verificada_por' => self::datosUsuario($verificador),
+            'motivo_rechazo' => $chofer->licencia_motivo_rechazo,
+            'rechazada_en' => $chofer->licencia_rechazada_en?->toIso8601String(),
+            'rechazada_por' => self::datosUsuario($rechazador),
             'borrado_habilitado' => (bool) $chofer->licencia_borrado_habilitado,
             'puede_subir' => ! $tieneArchivo && ($chofer->licencia_estado ?: Chofer::LICENCIA_PENDIENTE) !== Chofer::LICENCIA_VERIFICADA,
             'bloqueada' => $tieneArchivo && ! $chofer->licencia_borrado_habilitado,
