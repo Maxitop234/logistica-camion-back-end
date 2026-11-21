@@ -55,6 +55,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Initial Accounts Configuration (Company vs Demo)
+    |--------------------------------------------------------------------------
+    |
+    | All initial credentials come from environment variables; no passwords
+    | are hardcoded in seeders.
+    |
+    */
+
+    'admin' => [
+        'email' => env('ADMIN_EMAIL'),
+        'password' => env('ADMIN_PASSWORD'),
+        'nombre' => env('ADMIN_NOMBRE', 'Administración EcoRuta'),
+    ],
+
+    'demo' => [
+        'admin_email' => env('DEMO_ADMIN_EMAIL'),
+        'admin_password' => env('DEMO_ADMIN_PASSWORD'),
+        'chofer_password' => env('DEMO_CHOFER_PASSWORD'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Application URL
     |--------------------------------------------------------------------------
     |
