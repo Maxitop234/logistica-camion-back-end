@@ -20,6 +20,7 @@ class RutaPuntoResource extends JsonResource
             'id' => $this->id,
             'orden_parada' => $this->orden_parada,
             'estado_llenado_inicial' => $this->estado_llenado_inicial,
+            'porcentaje_llenado_al_vaciar' => $this->porcentaje_llenado_al_vaciar,
             'estado_parada' => $this->estado_parada,
             'distancia_tramo_km' => $this->distancia_tramo_km !== null ? (float) $this->distancia_tramo_km : null,
             'duracion_tramo_min' => $this->duracion_tramo_min,

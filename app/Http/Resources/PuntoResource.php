@@ -24,6 +24,8 @@ class PuntoResource extends JsonResource
             'tipo_punto' => $this->tipo_punto === Punto::TIPO_CONDOMINIO
                 ? Punto::TIPO_CONDOMINIO
                 : Punto::TIPO_CALLE,
+            'sector' => $this->sector,
+            'sector_resuelto' => $this->resource->sectorResuelto(),
             'latitud' => (float) $this->latitud,
             'longitud' => (float) $this->longitud,
             'porcentaje_llenado' => (int) $this->porcentaje_llenado,

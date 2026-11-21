@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\ChoferController;
 use App\Http\Controllers\Api\V1\GeocodificacionController;
 use App\Http\Controllers\Api\V1\GpsController;
 use App\Http\Controllers\Api\V1\IotLecturaController;
+use App\Http\Controllers\Api\V1\KpiController;
 use App\Http\Controllers\Api\V1\LicenciaChoferController;
 use App\Http\Controllers\Api\V1\NotificacionChoferController;
 use App\Http\Controllers\Api\V1\NotificacionLicenciaController;
@@ -83,6 +84,12 @@ Route::prefix('v1')->group(function () {
         Route::post('rutas/generar', [RutaController::class, 'generar']);
         Route::get('rutas/{ruta}/traza', [GpsController::class, 'traza']);
         Route::get('gps/flota', [GpsController::class, 'flota']);
+
+        Route::get('kpis/dashboard', [KpiController::class, 'dashboard']);
+        Route::get('kpis/alertas', [KpiController::class, 'alertas']);
+        Route::get('kpis/parametros', [KpiController::class, 'parametros']);
+        Route::put('kpis/parametros', [KpiController::class, 'actualizarParametros']);
+        Route::get('kpis/exportar', [KpiController::class, 'exportar']);
 
         Route::get('choferes/{chofer}/licencia/archivo', [LicenciaChoferController::class, 'archivoPorAdmin']);
         Route::post('choferes/{chofer}/licencia/verificar', [LicenciaChoferController::class, 'verificar']);

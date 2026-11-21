@@ -75,6 +75,7 @@ class PuntoController extends Controller
                 'nombre_automatico' => (bool) ($datos['nombre_automatico'] ?? true),
                 'direccion' => $datos['direccion'],
                 'tipo_punto' => $datos['tipo_punto'],
+                'sector' => $datos['sector'] ?? null,
                 'latitud' => $datos['latitud'],
                 'longitud' => $datos['longitud'],
                 'porcentaje_llenado' => $porcentaje,

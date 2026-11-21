@@ -14,6 +14,7 @@ use Illuminate\Support\Carbon;
  * @property int $punto_id
  * @property int $orden_parada
  * @property string $estado_llenado_inicial
+ * @property int|null $porcentaje_llenado_al_vaciar
  * @property string $estado_parada
  * @property string|null $distancia_tramo_km
  * @property int|null $duracion_tramo_min
@@ -31,6 +32,7 @@ use Illuminate\Support\Carbon;
     'punto_id',
     'orden_parada',
     'estado_llenado_inicial',
+    'porcentaje_llenado_al_vaciar',
     'estado_parada',
     'distancia_tramo_km',
     'duracion_tramo_min',
@@ -55,6 +57,7 @@ class RutaPunto extends Model
     {
         return [
             'orden_parada' => 'integer',
+            'porcentaje_llenado_al_vaciar' => 'integer',
             'duracion_tramo_min' => 'integer',
             'hora_estimada_llegada' => 'datetime',
             'hora_real_recoleccion' => 'datetime',

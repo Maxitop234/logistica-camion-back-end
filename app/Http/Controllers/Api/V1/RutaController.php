@@ -224,6 +224,7 @@ class RutaController extends Controller
                 }
 
                 $parada = $ruta->paradas()
+                    ->with('punto')
                     ->where('punto_id', $item['punto_id'])
                     ->first();
 
@@ -231,8 +232,14 @@ class RutaController extends Controller
                     continue;
                 }
 
+                // Captura el % de llenado real justo antes de vaciar el punto (KPI 4).
+                $porcentajeAlVaciar = $parada->punto instanceof Punto
+                    ? (int) $parada->punto->porcentaje_llenado
+                    : null;
+
                 $parada->update([
                     'estado_parada' => RutaPunto::ESTADO_RECOLECTADO,
+                    'porcentaje_llenado_al_vaciar' => $porcentajeAlVaciar,
                     'hora_real_recoleccion' => Carbon::parse($item['hora_real_recoleccion']),
                     'sync_uuid' => $item['sync_uuid'],
                     'sincronizado_offline' => true,

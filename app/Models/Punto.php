@@ -17,6 +17,7 @@ use Illuminate\Support\Carbon;
  * @property bool $nombre_automatico
  * @property string $direccion
  * @property string $tipo_punto
+ * @property string|null $sector
  * @property string $latitud
  * @property string $longitud
  * @property string $estado_llenado
@@ -39,6 +40,7 @@ use Illuminate\Support\Carbon;
     'nombre_automatico',
     'direccion',
     'tipo_punto',
+    'sector',
     'latitud',
     'longitud',
     'estado_llenado',
@@ -69,6 +71,25 @@ class Punto extends Model
 
     /** @var array<int, string> */
     public const TIPOS_VALIDOS = [self::TIPO_CONDOMINIO, self::TIPO_CALLE];
+
+    public const SECTOR_CENTRO = 'Centro';
+
+    public const SECTOR_PONIENTE = 'Poniente';
+
+    public const SECTOR_ORIENTE = 'Oriente';
+
+    public const SECTOR_NORTE = 'Norte';
+
+    public const SECTOR_PADRE_LAS_CASAS = 'Padre Las Casas';
+
+    /** @var array<int, string> */
+    public const SECTORES_VALIDOS = [
+        self::SECTOR_CENTRO,
+        self::SECTOR_PONIENTE,
+        self::SECTOR_ORIENTE,
+        self::SECTOR_NORTE,
+        self::SECTOR_PADRE_LAS_CASAS,
+    ];
 
     public const ORIGEN_MANUAL = 'manual';
 
@@ -160,6 +181,39 @@ class Punto extends Model
     {
         return (is_string($this->sensor_token_hash) && $this->sensor_token_hash !== '')
             || (is_string($this->sensor_codigo) && $this->sensor_codigo !== '');
+    }
+
+    /**
+     * Devuelve el sector explícito si pertenece a la lista cerrada o, en su
+     * defecto, lo clasifica automáticamente por cuadrante geográfico en
+     * Temuco / Padre Las Casas.
+     */
+    public function sectorResuelto(): string
+    {
+        if (is_string($this->sector) && in_array($this->sector, self::SECTORES_VALIDOS, true)) {
+            return $this->sector;
+        }
+
+        return self::clasificarSectorPorCoordenada((float) $this->latitud, (float) $this->longitud);
+    }
+
+    public static function clasificarSectorPorCoordenada(float $lat, float $lon): string
+    {
+        // Al sur del río Cautín: Padre Las Casas.
+        if ($lat <= -38.7580) {
+            return self::SECTOR_PADRE_LAS_CASAS;
+        }
+        if ($lat >= -38.7240) {
+            return self::SECTOR_NORTE;
+        }
+        if ($lon <= -72.6020) {
+            return self::SECTOR_PONIENTE;
+        }
+        if ($lon >= -72.5800) {
+            return self::SECTOR_ORIENTE;
+        }
+
+        return self::SECTOR_CENTRO;
     }
 
     /**

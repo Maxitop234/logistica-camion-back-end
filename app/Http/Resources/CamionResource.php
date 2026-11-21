@@ -23,6 +23,8 @@ class CamionResource extends JsonResource
             'modelo' => $this->modelo,
             'anio' => $this->anio,
             'capacidad_kg' => $this->capacidad_kg,
+            'rendimiento_km_l' => $this->rendimiento_km_l !== null ? (float) $this->rendimiento_km_l : null,
+            'costo_arriendo_diario' => $this->costo_arriendo_diario !== null ? (int) $this->costo_arriendo_diario : null,
             'estado_operativo' => $this->estado_operativo,
             'motivo_desactivacion' => $this->motivo_desactivacion,
             'desactivado_en' => $this->desactivado_en?->toIso8601String(),

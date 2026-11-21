@@ -23,6 +23,7 @@ class StorePuntoRequest extends FormRequest
             'nombre_automatico' => ['sometimes', 'boolean'],
             'direccion' => ['required', 'string', 'min:3', 'max:255'],
             'tipo_punto' => ['required', 'string', Rule::in(Punto::TIPOS_VALIDOS)],
+            'sector' => ['sometimes', 'nullable', 'string', Rule::in(Punto::SECTORES_VALIDOS)],
             'latitud' => ['required', 'numeric', 'between:-90,90'],
             'longitud' => ['required', 'numeric', 'between:-180,180'],
             'porcentaje_llenado' => ['sometimes', 'integer', 'between:0,100'],
@@ -36,6 +37,9 @@ class StorePuntoRequest extends FormRequest
         if (is_string($this->sensor_codigo)) {
             $limpio = trim($this->sensor_codigo);
             $this->merge(['sensor_codigo' => $limpio === '' ? null : $limpio]);
+        }
+        if (is_string($this->sector) && trim($this->sector) === '') {
+            $this->merge(['sector' => null]);
         }
     }
 }

@@ -27,6 +27,8 @@ class UpdateCamionRequest extends FormRequest
             'modelo' => ['sometimes', 'string', 'max:255'],
             'anio' => ['sometimes', 'integer', 'between:1980,'.(now()->year + 1)],
             'capacidad_kg' => ['sometimes', 'numeric', 'gt:0', 'max:999999.99'],
+            'rendimiento_km_l' => ['sometimes', 'nullable', 'numeric', 'gt:0', 'max:50'],
+            'costo_arriendo_diario' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:10000000'],
             'estado_operativo' => ['sometimes', Rule::in(['disponible', 'en_ruta', 'mantenimiento', 'inactivo'])],
             'chofer_actual_id' => [
                 'sometimes', 'nullable', 'integer', 'exists:choferes,id',

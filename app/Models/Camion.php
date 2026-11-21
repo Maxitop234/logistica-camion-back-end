@@ -17,6 +17,8 @@ use Illuminate\Support\Carbon;
  * @property string $modelo
  * @property int $anio
  * @property string $capacidad_kg
+ * @property string|null $rendimiento_km_l
+ * @property int|null $costo_arriendo_diario
  * @property string $estado_operativo
  * @property int|null $chofer_actual_id
  * @property string|null $motivo_desactivacion
@@ -31,7 +33,8 @@ use Illuminate\Support\Carbon;
  */
 #[Table('camiones')]
 #[Fillable([
-    'patente', 'marca', 'modelo', 'anio', 'capacidad_kg', 'estado_operativo', 'chofer_actual_id',
+    'patente', 'marca', 'modelo', 'anio', 'capacidad_kg', 'rendimiento_km_l', 'costo_arriendo_diario',
+    'estado_operativo', 'chofer_actual_id',
     'motivo_desactivacion', 'desactivado_en', 'desactivado_por_user_id',
     'ultima_latitud', 'ultima_longitud', 'velocidad_actual_kmh', 'ultima_actualizacion_gps',
 ])]
@@ -50,6 +53,8 @@ class Camion extends Model
         return [
             'anio' => 'integer',
             'capacidad_kg' => 'decimal:2',
+            'rendimiento_km_l' => 'decimal:2',
+            'costo_arriendo_diario' => 'integer',
             'desactivado_en' => 'datetime',
             'ultima_latitud' => 'decimal:7',
             'ultima_longitud' => 'decimal:7',
