@@ -12,6 +12,7 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $chofer_id
  * @property string $nombre
+ * @property bool $nombre_automatico
  * @property string $direccion
  * @property string $tipo_punto
  * @property string $latitud
@@ -29,6 +30,7 @@ use Illuminate\Support\Carbon;
 #[Fillable([
     'chofer_id',
     'nombre',
+    'nombre_automatico',
     'direccion',
     'tipo_punto',
     'latitud',
@@ -48,12 +50,18 @@ class SolicitudPunto extends Model
 
     public const ESTADO_RECHAZADA = 'rechazada';
 
+    /** @var array<string, mixed> */
+    protected $attributes = [
+        'nombre_automatico' => true,
+    ];
+
     /**
      * @return array<string, string>
      */
     protected function casts(): array
     {
         return [
+            'nombre_automatico' => 'boolean',
             'resuelta_en' => 'datetime',
         ];
     }

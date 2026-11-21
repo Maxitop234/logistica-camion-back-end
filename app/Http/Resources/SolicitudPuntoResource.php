@@ -22,6 +22,7 @@ class SolicitudPuntoResource extends JsonResource
         return [
             'id' => $this->id,
             'nombre' => $this->nombre,
+            'nombre_automatico' => (bool) $this->nombre_automatico,
             'direccion' => $this->direccion,
             'tipo_punto' => $this->tipo_punto,
             'latitud' => (float) $this->latitud,

@@ -23,6 +23,7 @@ class UpdatePuntoRequest extends FormRequest
 
         return [
             'nombre' => ['sometimes', 'string', 'min:3', 'max:255'],
+            'nombre_automatico' => ['sometimes', 'boolean'],
             'direccion' => ['sometimes', 'string', 'min:3', 'max:255'],
             'tipo_punto' => ['sometimes', 'string', Rule::in(Punto::TIPOS_VALIDOS)],
             'latitud' => ['sometimes', 'numeric', 'between:-90,90'],

@@ -34,6 +34,7 @@ class SolicitudPuntoController extends Controller
             $nueva = SolicitudPunto::create([
                 'chofer_id' => $chofer->id,
                 'nombre' => $datos['nombre'],
+                'nombre_automatico' => (bool) ($datos['nombre_automatico'] ?? true),
                 'direccion' => $datos['direccion'],
                 'tipo_punto' => $datos['tipo_punto'],
                 'latitud' => $datos['latitud'],
@@ -89,6 +90,7 @@ class SolicitudPuntoController extends Controller
         DB::transaction(function () use ($solicitud, $request): void {
             $punto = Punto::create([
                 'nombre' => $solicitud->nombre,
+                'nombre_automatico' => (bool) $solicitud->nombre_automatico,
                 'direccion' => $solicitud->direccion,
                 'tipo_punto' => $solicitud->tipo_punto,
                 'latitud' => $solicitud->latitud,

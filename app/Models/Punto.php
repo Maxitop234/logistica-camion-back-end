@@ -14,6 +14,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property string $nombre
+ * @property bool $nombre_automatico
  * @property string $direccion
  * @property string $tipo_punto
  * @property string $latitud
@@ -35,6 +36,7 @@ use Illuminate\Support\Carbon;
 #[Table('puntos')]
 #[Fillable([
     'nombre',
+    'nombre_automatico',
     'direccion',
     'tipo_punto',
     'latitud',
@@ -55,6 +57,11 @@ class Punto extends Model
 {
     /** @use HasFactory<PuntoFactory> */
     use HasFactory;
+
+    /** @var array<string, mixed> */
+    protected $attributes = [
+        'nombre_automatico' => true,
+    ];
 
     public const TIPO_CONDOMINIO = 'condominio';
 
@@ -125,6 +132,7 @@ class Punto extends Model
     protected function casts(): array
     {
         return [
+            'nombre_automatico' => 'boolean',
             'porcentaje_llenado' => 'integer',
             'altura_contenedor_cm' => 'decimal:2',
             'bateria_voltaje' => 'decimal:2',

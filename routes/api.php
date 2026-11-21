@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CamionController;
 use App\Http\Controllers\Api\V1\ChoferController;
+use App\Http\Controllers\Api\V1\GeocodificacionController;
 use App\Http\Controllers\Api\V1\GpsController;
 use App\Http\Controllers\Api\V1\IotLecturaController;
 use App\Http\Controllers\Api\V1\LicenciaChoferController;
@@ -32,6 +33,12 @@ Route::prefix('v1')->group(function () {
     // Ingesta IoT desde hardware ESP32 autenticado por token de sensor (sin cuenta humana).
     Route::post('iot/lecturas', [IotLecturaController::class, 'store'])
         ->middleware('throttle:120,1');
+
+    // Geocodificación inversa (Nominatim) compartida para administrador y chofer activos.
+    Route::middleware(['auth:sanctum', 'active', 'role:administrador,chofer'])->group(function () {
+        Route::get('geocodificacion/inversa', [GeocodificacionController::class, 'inversa'])
+            ->middleware('throttle:60,1');
+    });
 
     // Endpoints restringidos permitidos a un chofer incluso si su cuenta está desactivada.
     Route::middleware(['auth:sanctum', 'active:permitir_chofer_inactivo', 'role:chofer'])->prefix('chofer')->group(function () {

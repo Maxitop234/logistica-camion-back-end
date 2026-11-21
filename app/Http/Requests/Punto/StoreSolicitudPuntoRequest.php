@@ -20,6 +20,7 @@ class StoreSolicitudPuntoRequest extends FormRequest
     {
         return [
             'nombre' => ['required', 'string', 'min:3', 'max:255'],
+            'nombre_automatico' => ['sometimes', 'boolean'],
             'direccion' => ['required', 'string', 'min:3', 'max:255'],
             'tipo_punto' => ['required', 'string', Rule::in(Punto::TIPOS_VALIDOS)],
             'latitud' => ['required', 'numeric', 'between:-90,90'],

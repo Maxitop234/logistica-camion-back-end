@@ -72,6 +72,7 @@ class PuntoController extends Controller
         $punto = DB::transaction(function () use ($datos, $porcentaje, $altura, $request, $telemetry): Punto {
             $creado = Punto::create([
                 'nombre' => $datos['nombre'],
+                'nombre_automatico' => (bool) ($datos['nombre_automatico'] ?? true),
                 'direccion' => $datos['direccion'],
                 'tipo_punto' => $datos['tipo_punto'],
                 'latitud' => $datos['latitud'],
