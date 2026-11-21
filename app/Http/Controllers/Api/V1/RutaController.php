@@ -12,6 +12,7 @@ use App\Models\Chofer;
 use App\Models\Punto;
 use App\Models\Ruta;
 use App\Models\RutaPunto;
+use App\Services\GpsTelemetryService;
 use App\Services\OsmRouteOptimizerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -252,7 +253,7 @@ class RutaController extends Controller
     /**
      * Finaliza una ruta en curso y devuelve el camión a estado disponible.
      */
-    public function finalizar(Request $request, Ruta $ruta): RutaResource|JsonResponse
+    public function finalizar(Request $request, Ruta $ruta, GpsTelemetryService $gpsService): RutaResource|JsonResponse
     {
         $chofer = $request->user()?->chofer()->first();
         if (! $chofer instanceof Chofer || $ruta->chofer_id !== $chofer->id) {
@@ -263,10 +264,13 @@ class RutaController extends Controller
             return response()->json(['message' => 'Solo se pueden finalizar rutas en curso.'], 422);
         }
 
-        DB::transaction(function () use ($ruta, $request): void {
+        DB::transaction(function () use ($ruta, $request, $gpsService): void {
+            $distanciaRealKm = $gpsService->recalcularDistanciaReal($ruta);
+
             $ruta->update([
                 'estado' => Ruta::ESTADO_COMPLETADA,
                 'hora_termino_real' => now(),
+                'distancia_real_km' => $distanciaRealKm,
             ]);
 
             $ruta->camion()->update(['estado_operativo' => 'disponible']);
@@ -274,6 +278,7 @@ class RutaController extends Controller
             AuditLog::registrar('ruta_finalizada', $request->user(), $request, [
                 'ruta_id' => $ruta->id,
                 'camion_id' => $ruta->camion_id,
+                'distancia_real_km' => $distanciaRealKm,
             ]);
         });
 

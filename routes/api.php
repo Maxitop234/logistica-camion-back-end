@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CamionController;
 use App\Http\Controllers\Api\V1\ChoferController;
+use App\Http\Controllers\Api\V1\GpsController;
 use App\Http\Controllers\Api\V1\IotLecturaController;
 use App\Http\Controllers\Api\V1\LicenciaChoferController;
 use App\Http\Controllers\Api\V1\NotificacionChoferController;
@@ -58,6 +59,7 @@ Route::prefix('v1')->group(function () {
         Route::post('rutas/{ruta}/iniciar', [RutaController::class, 'iniciar']);
         Route::post('rutas/{ruta}/sincronizar-lote', [RutaController::class, 'sincronizarLote']);
         Route::post('rutas/{ruta}/finalizar', [RutaController::class, 'finalizar']);
+        Route::post('gps/ping', [GpsController::class, 'ping'])->middleware('throttle:120,1');
     });
 
     Route::middleware(['auth:sanctum', 'active', 'role:administrador'])->group(function () {
@@ -72,6 +74,8 @@ Route::prefix('v1')->group(function () {
 
         Route::get('rutas', [RutaController::class, 'index']);
         Route::post('rutas/generar', [RutaController::class, 'generar']);
+        Route::get('rutas/{ruta}/traza', [GpsController::class, 'traza']);
+        Route::get('gps/flota', [GpsController::class, 'flota']);
 
         Route::get('choferes/{chofer}/licencia/archivo', [LicenciaChoferController::class, 'archivoPorAdmin']);
         Route::post('choferes/{chofer}/licencia/verificar', [LicenciaChoferController::class, 'verificar']);

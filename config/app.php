@@ -43,6 +43,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Application Demo Mode
+    |--------------------------------------------------------------------------
+    |
+    | Must stay false in production/company environments. When true, allows
+    | GPS pings explicitly flagged as simulated for demonstration purposes.
+    |
+    */
+
+    'demo_mode' => (bool) env('APP_DEMO_MODE', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application URL
     |--------------------------------------------------------------------------
     |

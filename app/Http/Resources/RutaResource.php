@@ -33,6 +33,7 @@ class RutaResource extends JsonResource
             'puntos_incluidos_count' => $this->puntos_incluidos_count,
             'puntos_excluidos_count' => $this->puntos_excluidos_count,
             'distancia_estimada_km' => (float) $this->distancia_estimada_km,
+            'distancia_real_km' => (float) ($this->distancia_real_km ?? 0),
             'duracion_estimada_min' => $this->duracion_estimada_min,
             'encoded_polyline' => $this->encoded_polyline,
             'hora_inicio_real' => $this->hora_inicio_real?->toIso8601String(),

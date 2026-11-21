@@ -20,6 +20,7 @@ use Illuminate\Support\Carbon;
  * @property int $puntos_incluidos_count
  * @property int $puntos_excluidos_count
  * @property string $distancia_estimada_km
+ * @property string $distancia_real_km
  * @property int $duracion_estimada_min
  * @property string|null $encoded_polyline
  * @property Carbon|null $hora_inicio_real
@@ -38,6 +39,7 @@ use Illuminate\Support\Carbon;
     'puntos_incluidos_count',
     'puntos_excluidos_count',
     'distancia_estimada_km',
+    'distancia_real_km',
     'duracion_estimada_min',
     'encoded_polyline',
     'hora_inicio_real',
@@ -63,6 +65,7 @@ class Ruta extends Model
             'total_puntos_evaluados' => 'integer',
             'puntos_incluidos_count' => 'integer',
             'puntos_excluidos_count' => 'integer',
+            'distancia_real_km' => 'decimal:2',
             'duracion_estimada_min' => 'integer',
             'hora_inicio_real' => 'datetime',
             'hora_termino_real' => 'datetime',
@@ -99,5 +102,13 @@ class Ruta extends Model
     public function paradas(): HasMany
     {
         return $this->hasMany(RutaPunto::class)->orderBy('orden_parada');
+    }
+
+    /**
+     * @return HasMany<TelemetriaGps, $this>
+     */
+    public function telemetriaGps(): HasMany
+    {
+        return $this->hasMany(TelemetriaGps::class)->orderBy('capturado_en')->orderBy('id');
     }
 }
