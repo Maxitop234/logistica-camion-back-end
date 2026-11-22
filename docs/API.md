@@ -383,6 +383,8 @@ Cada parada del recurso `Ruta` incluye además `motivo_inclusion`: `sensor`, `ma
 
 ### 4.8 KPI (BE-13, BE-14)
 
+> **Día de negocio:** la base y la API siguen en UTC, pero «hoy», los filtros de fecha, el fin del período por defecto (hoy), la proyección de «mañana» y el historial demo se calculan en `ZONA_HORARIA_OPERACION` (por defecto `America/Santiago`) con `App\Support\DiaDeNegocio`. A las 22:30 de Chile (ya es el día siguiente en UTC) «hoy» sigue siendo el día de Chile.
+
 `GET /kpis/dashboard?fecha_inicio=2026-11-01&fecha_fin=2026-11-30&agrupacion=semana|mes|trimestre|semestre|anio&chofer_id=&camion_id=`
 
 ```json

@@ -13,6 +13,7 @@ use App\Models\Punto;
 use App\Models\Ruta;
 use App\Models\RutaPunto;
 use App\Models\TelemetriaGps;
+use App\Support\DiaDeNegocio;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -70,8 +71,10 @@ class GenerarHistorialDemoCommand extends Command
             return self::FAILURE;
         }
 
-        $ahora = Carbon::now();
-        $fechaFin = $ahora->copy()->startOfDay();
+        // "Hoy" es el día de la operación (America/Santiago), no el día UTC; los
+        // instantes se guardan en UTC.
+        $ahora = Carbon::instance(DiaDeNegocio::ahora())->utc();
+        $fechaFin = Carbon::instance(DiaDeNegocio::hoy())->utc();
         $fechaInicio = $fechaFin->copy()->subMonths($meses)->startOfDay();
         $rng = new Randomizer(new Mt19937($semilla));
 

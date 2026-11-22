@@ -10,10 +10,11 @@ use App\Services\Iot\SimuladorDeSensores;
 use App\Services\KpiAlertasService;
 use App\Services\KpiCalculatorService;
 use App\Services\KpiExportService;
+use App\Support\DiaDeNegocio;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class KpiController extends Controller
@@ -132,7 +133,7 @@ class KpiController extends Controller
     }
 
     /**
-     * @return array{0: Carbon, 1: Carbon, 2: string}
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable, 2: string}
      */
     private function resolverFiltro(Request $request): array
     {
@@ -143,11 +144,11 @@ class KpiController extends Controller
         ]);
 
         $fin = $request->filled('fecha_fin')
-            ? Carbon::parse((string) $request->query('fecha_fin'))
-            : Carbon::today();
+            ? DiaDeNegocio::inicioDelDia((string) $request->query('fecha_fin'))
+            : DiaDeNegocio::hoy();
         $inicio = $request->filled('fecha_inicio')
-            ? Carbon::parse((string) $request->query('fecha_inicio'))
-            : $fin->copy()->subDays(29);
+            ? DiaDeNegocio::inicioDelDia((string) $request->query('fecha_inicio'))
+            : $fin->subDays(29);
         $agrupacion = (string) $request->query('agrupacion', 'semana');
 
         return [$inicio, $fin, $agrupacion];

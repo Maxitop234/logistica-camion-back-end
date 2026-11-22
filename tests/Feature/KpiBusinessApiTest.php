@@ -12,9 +12,14 @@ use App\Models\RutaPunto;
 use App\Models\Sector;
 use App\Models\TelemetriaGps;
 use App\Models\User;
+use App\Support\DiaDeNegocio;
 use Database\Seeders\SectorSeeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+
+afterEach(function (): void {
+    Carbon::setTestNow();
+});
 
 beforeEach(function (): void {
     $this->admin = User::factory()->create(['role' => 'administrador']);
@@ -365,8 +370,10 @@ it('calcula exactamente KPI-07 (planificación) y KPI-08 (confiabilidad sensores
 });
 
 it('calcula y autoevalúa KPI-09 bajo demanda sin cron', function (): void {
+    // 22:30 en Chile ya es el día siguiente en UTC: el "hoy" del KPI es el de Chile.
+    Carbon::setTestNow(Carbon::parse('2026-11-23 01:30:00', 'UTC'));
     $camion = Camion::factory()->create();
-    $ayer = today()->subDay();
+    $ayer = Carbon::instance(DiaDeNegocio::hoy())->utc()->subDay();
 
     // 2 puntos activos que ayer alcanzaron >= 70% y hoy suben +20%/día (ambos listos mañana).
     $p1 = Punto::create([
@@ -427,7 +434,7 @@ it('calcula y autoevalúa KPI-09 bajo demanda sin cron', function (): void {
     // Se evaluó ayer y se guardó la proyección de mañana bajo demanda.
     expect($proyAyer->fresh()->puntos_reales_listos)->toBe(2)
         ->and((float) $proyAyer->fresh()->porcentaje_acierto)->toBe(100.0)
-        ->and(ProyeccionFlota::whereDate('fecha_objetivo', today()->addDay()->format('Y-m-d'))->exists())->toBeTrue();
+        ->and(ProyeccionFlota::whereDate('fecha_objetivo', DiaDeNegocio::hoy()->addDay()->format('Y-m-d'))->exists())->toBeTrue();
 });
 
 it('calcula exactamente KPI-10 (ranking ajustado por mediana de sector) y KPI-11 (costo conducción con límite 50 km/h)', function (): void {
@@ -611,8 +618,9 @@ it('las alertas nombran el sector real del punto (relación sector) y traen grav
 });
 
 it('KPI-09 declara % en su serie y KPI-03 declara horas', function (): void {
+    Carbon::setTestNow(Carbon::parse('2026-11-23 01:30:00', 'UTC'));
     $camion = Camion::factory()->create();
-    $ayer = today()->subDay();
+    $ayer = Carbon::instance(DiaDeNegocio::hoy())->utc()->subDay();
     $p1 = Punto::create([
         'nombre' => 'Proy 1', 'direccion' => 'D1', 'tipo_punto' => Punto::TIPO_CALLE,
         'sector_id' => sectorKpi('Centro'), 'latitud' => -38.735, 'longitud' => -72.59,

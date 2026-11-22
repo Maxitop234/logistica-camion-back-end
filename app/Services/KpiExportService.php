@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\DiaDeNegocio;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class KpiExportService
@@ -73,7 +74,7 @@ class KpiExportService
     {
         $pdf = Pdf::loadView('kpis.reporte_pdf', [
             'dashboard' => $dashboard,
-            'generadoEn' => now()->format('d-m-Y H:i'),
+            'generadoEn' => DiaDeNegocio::ahora()->format('d-m-Y H:i'),
         ])->setPaper('a4', 'portrait');
 
         return $pdf->output();

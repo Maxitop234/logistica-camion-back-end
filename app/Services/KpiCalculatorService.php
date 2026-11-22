@@ -10,6 +10,7 @@ use App\Models\Punto;
 use App\Models\Ruta;
 use App\Models\RutaPunto;
 use App\Models\TelemetriaGps;
+use App\Support\DiaDeNegocio;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -1300,7 +1301,7 @@ class KpiCalculatorService
 
         $rutasHistoricas = Ruta::query()
             ->where('estado', Ruta::ESTADO_COMPLETADA)
-            ->where('fecha_programada', '>=', now()->subDays(30)->format('Y-m-d'))
+            ->where('fecha_programada', '>=', DiaDeNegocio::hoy()->subDays(30)->format('Y-m-d'))
             ->with('paradas')
             ->get();
 
@@ -1356,7 +1357,7 @@ class KpiCalculatorService
             : (int) ceil($puntosListosManana / max(1.0, $capacidadCamionDia));
 
         // 2. Persistir/actualizar bajo demanda la proyección para mañana (idempotente).
-        $manana = today()->addDay()->format('Y-m-d');
+        $manana = DiaDeNegocio::hoy()->addDay()->format('Y-m-d');
         ProyeccionFlota::updateOrCreate(
             ['fecha_objetivo' => $manana],
             [
@@ -2371,13 +2372,13 @@ class KpiCalculatorService
     {
         $pendientes = ProyeccionFlota::query()
             ->whereNull('puntos_reales_listos')
-            ->whereDate('fecha_objetivo', '<=', today()->format('Y-m-d'))
+            ->whereDate('fecha_objetivo', '<=', DiaDeNegocio::hoy()->format('Y-m-d'))
             ->get();
 
         foreach ($pendientes as $proy) {
             $fecha = $proy->fecha_objetivo;
-            $inicio = $fecha->copy()->startOfDay();
-            $fin = $fecha->copy()->endOfDay();
+            $inicio = DiaDeNegocio::inicioDelDia($fecha);
+            $fin = DiaDeNegocio::finDelDia($fecha);
 
             $idsPorLectura = LecturaPunto::query()
                 ->whereBetween('medido_en', [$inicio, $fin])
