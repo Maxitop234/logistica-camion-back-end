@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Notifications\RestablecerPasswordAdministrador;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -27,10 +28,13 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string|null $remember_token
  * @property string $role
  * @property bool $is_active
+ * @property bool $debe_cambiar_password
+ * @property bool $cuenta_protegida
+ * @property Carbon|null $password_cambiada_en
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'email', 'password', 'role', 'is_active'])]
+#[Fillable(['name', 'email', 'password', 'role', 'is_active', 'debe_cambiar_password', 'cuenta_protegida', 'password_cambiada_en'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -49,7 +53,24 @@ class User extends Authenticatable
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
             'is_active' => 'boolean',
+            'debe_cambiar_password' => 'boolean',
+            'cuenta_protegida' => 'boolean',
+            'password_cambiada_en' => 'datetime',
         ];
+    }
+
+    public function sendPasswordResetNotification(#[\SensitiveParameter] $token): void
+    {
+        $this->notify(new RestablecerPasswordAdministrador($token));
+    }
+
+    /**
+     * En la demostración las cuentas sembradas no pueden cambiar su contraseña
+     * ni activar la verificación en dos pasos.
+     */
+    public function esCuentaDemoProtegida(): bool
+    {
+        return (bool) config('app.demo_mode') && $this->cuenta_protegida;
     }
 
     /**

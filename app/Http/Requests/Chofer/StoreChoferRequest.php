@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Chofer;
 
 use App\Models\Chofer;
+use App\Rules\ContrasenaSegura;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -21,7 +22,8 @@ class StoreChoferRequest extends FormRequest
     {
         return [
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8'],
+            'password' => ['required', 'string', new ContrasenaSegura],
+            'debe_cambiar_password' => ['sometimes', 'boolean'],
             'nombre' => ['required', 'string', 'max:255'],
             'rut' => [
                 'required', 'string',

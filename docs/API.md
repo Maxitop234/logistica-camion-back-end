@@ -93,6 +93,38 @@ Errores: `401 Credenciales inválidas.` · `403 La cuenta está desactivada.` ·
 - `logout` revoca el token actual y responde `200 {"message": "Sesión cerrada."}`.
 - `me` responde `{"data": UserResource}`. Para un chofer agrega `camion` (`{id, patente, estado_operativo}` o `null`) y `ruta_activa`, que hoy es siempre `null` (BE-11).
 
+### 3.2b Seguridad de cuentas y sesiones
+
+- **Sin registro público:** no existen `/register`, `/login`, `/forgot-password` ni otras rutas web de Fortify (solo se usa su TOTP).
+- **Vencimiento de tokens:** administrador `SESION_ADMIN_HORAS` (12 h), chofer `SESION_CHOFER_DIAS` (30 días). Vencido → `401`; la app vuelve al login sin tocar la cola offline.
+- **Contraseñas:** mínimo 10 caracteres, `password_confirmation`, se rechazan las comunes, repeticiones/secuencias y las que contienen el correo (`422`).
+- **Cambio obligatorio:** con `debe_cambiar_password: true` toda ruta protegida responde `403 {code: "cambio_password_requerido"}` salvo `GET /auth/me`, `POST /auth/logout` y `POST /auth/password`.
+- **Demo (`APP_DEMO_MODE=true`):** las cuentas sembradas por `DemoSeeder` (`cuenta_protegida`) responden `403 "No disponible en la demostración."` al cambiar contraseña, activar 2FA o restablecerse. Se pueden crear choferes nuevos y restablecer su contraseña.
+
+| Endpoint | Cuerpo / reglas | Respuesta |
+|---|---|---|
+| `GET /auth/opciones` (público) | — | `{modo_demo, recuperacion_por_correo}` |
+| `POST /auth/login` | como antes | Si el administrador tiene 2FA: `200 {requiere_dos_pasos: true, desafio, vence_en_segundos}` (sin token) |
+| `POST /auth/dos-pasos/desafio` | `desafio`, y `codigo` (6 dígitos) o `codigo_recuperacion` | `200` como el login; `401` código inválido (5 intentos por minuto; al 5.º fallo el desafío se anula); `429` |
+| `POST /auth/password` | `password_actual`, `password`, `password_confirmation` | `200 {message, user}`; revoca las demás sesiones; `422` / `403` demo |
+| `GET /auth/dos-pasos` · `POST /auth/dos-pasos/iniciar` · `POST /auth/dos-pasos/confirmar` · `DELETE /auth/dos-pasos` | Solo administrador. `iniciar` → `{secreto, url_otpauth, qr_svg}`; `confirmar {codigo}` → `{activo, codigos_recuperacion[8]}` (única vez); `DELETE {password_actual}` | `403` en cuentas demo protegidas |
+| `POST /auth/recuperacion/solicitar` | `email`. Solo con correo real y `PASSWORD_RESET_EMAIL_ENABLED=true`; si no, `404` | `200` neutro siempre; enlace de un solo uso, 60 min, solo administradores; throttle `recuperacion-password` |
+| `POST /auth/recuperacion/restablecer` | `email`, `token`, `password`, `password_confirmation` | `200` o `422 "El enlace no es válido o venció."`; revoca todas las sesiones |
+
+`GET /auth/me` y `POST /auth/login` incluyen en `user`: `debe_cambiar_password`, `cuenta_protegida`, `dos_pasos_activo`.
+
+**Administradores** (`role:administrador`, solo `APP_DEMO_MODE=false`; en demo `403`). Toda acción sobre otra cuenta exige `password_actual` (la del que actúa) y se audita:
+
+| Acción | Respuesta |
+|---|---|
+| `GET /administradores` | `{data: [{id, user_id, nombre, cargo, email, is_active, debe_cambiar_password, dos_pasos_activo}]}` |
+| `POST /administradores` `{nombre, email, cargo?, telefono?, password_actual}` | `201 {data, password}` (temporal, única vez, cambio forzado) |
+| `POST /administradores/{id}/restablecer-password` | `200 {password}` y revoca sus sesiones |
+| `POST /administradores/{id}/desactivar` · `…/reactivar` | `200`; `409` si es el último administrador activo; `422` si es uno mismo |
+| `DELETE /administradores/{id}/dos-pasos` | `200`; audita `dos_pasos_desactivado` con `origen: otro_administrador` |
+
+Comandos (solo con acceso al servidor): `php artisan ecoruta:restablecer-admin {email} [--sin-2fa]` y `php artisan ecoruta:crear-admin` (interactivo; se niega con `APP_DEMO_MODE=true`). Ambos dejan contraseña temporal con cambio forzado.
+
 ### 3.3 Camiones — `role:administrador`
 
 **Recurso `Camion`**
@@ -129,8 +161,9 @@ Errores: `401 Credenciales inválidas.` · `403 La cuenta está desactivada.` ·
 | Acción | Cuerpo / reglas | Respuesta |
 |---|---|---|
 | `GET /choferes` | — | `200 {data: Chofer[]}` |
-| `POST /choferes` | `email` (único), `password` (≥ 8), `nombre`, `rut` (módulo 11 y único por HMAC; **no se devuelve**), `licencia_clase` (`A1`–`A5`, `B`–`F`; por defecto `A4`), `telefono` | `201`; crea `users` (rol `chofer`) y `choferes` en una transacción |
-| `PUT /choferes/{id}` | `nombre`, `telefono`, `licencia_clase`, `disponible` | `200` |
+| `POST /choferes` | `email` (único), `password` (≥ 10, no común; ver 3.2b), `debe_cambiar_password` (por defecto `true`), `nombre`, `rut` (módulo 11 y único por HMAC; **no se devuelve**), `licencia_clase` (`A1`–`A5`, `B`–`F`; por defecto `A4`), `telefono` | `201`; crea `users` (rol `chofer`) y `choferes` en una transacción |
+| `PUT /choferes/{id}` | `email` (único; al cambiarlo se revocan sus tokens), `nombre`, `telefono`, `licencia_clase`, `disponible` | `200` |
+| `POST /choferes/{id}/restablecer-password` | — | `200 {password, debe_cambiar_password: true}`; la contraseña temporal se entrega **una sola vez**, revoca sus tokens y audita (`chofer_password_restablecida`, sin la clave). `403` si es cuenta demo protegida |
 | `DELETE /choferes/{id}` | Cuerpo opcional `{motivo}` (hoy se ignora, BE-02) | `204`; desactiva la cuenta, revoca sus tokens y libera el camión |
 
 ### 3.5 Sectores y puntos de reciclaje — `role:administrador` (BE-03)

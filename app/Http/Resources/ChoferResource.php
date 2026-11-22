@@ -23,6 +23,7 @@ class ChoferResource extends JsonResource
             'user_id' => $this->user_id,
             'email' => $this->whenLoaded('user', fn () => $this->user->email),
             'is_active' => $this->whenLoaded('user', fn () => $this->user->is_active),
+            'debe_cambiar_password' => $this->whenLoaded('user', fn () => $this->user->debe_cambiar_password),
             'nombre' => $this->nombre_cifrado,
             'telefono' => $this->telefono_cifrado,
             'licencia_clase' => $this->licencia_clase,

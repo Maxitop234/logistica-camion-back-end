@@ -36,6 +36,8 @@ class DatabaseSeeder extends Seeder
             );
         }
 
+        $existia = User::where('email', $email)->exists();
+
         $user = User::updateOrCreate(
             ['email' => $email],
             [
@@ -43,6 +45,8 @@ class DatabaseSeeder extends Seeder
                 'password' => $password,
                 'role' => 'administrador',
                 'is_active' => true,
+                // La contraseña inicial viene del .env: se cambia en el primer ingreso.
+                ...($existia ? [] : ['debe_cambiar_password' => true]),
             ],
         );
 

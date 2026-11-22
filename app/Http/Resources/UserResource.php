@@ -33,6 +33,9 @@ class UserResource extends JsonResource
             'email' => $this->email,
             'role' => $this->role,
             'is_active' => $this->is_active,
+            'debe_cambiar_password' => $this->debe_cambiar_password,
+            'cuenta_protegida' => $this->esCuentaDemoProtegida(),
+            'dos_pasos_activo' => $this->role === 'administrador' && $this->hasEnabledTwoFactorAuthentication(),
             'perfil' => match (true) {
                 $chofer !== null => [
                     'id' => $chofer->id,

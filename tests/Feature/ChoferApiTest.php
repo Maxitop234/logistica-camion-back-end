@@ -12,7 +12,7 @@ beforeEach(function () {
 function datosChofer(array $extra = []): array
 {
     return [
-        'email' => 'Nuevo@Example.com', 'password' => 'password123', 'nombre' => 'Juan Pérez',
+        'email' => 'Nuevo@Example.com', 'password' => 'Zorro-Azul-4821', 'nombre' => 'Juan Pérez',
         'rut' => '12.345.678-5', 'telefono' => '+56912345678',
         ...$extra,
     ];
@@ -46,7 +46,7 @@ test('el chofer creado puede iniciar sesion', function () {
     $this->actingAs($this->admin, 'sanctum')->postJson('/api/v1/choferes', datosChofer())->assertCreated();
 
     $this->postJson('/api/v1/auth/login', [
-        'email' => 'nuevo@example.com', 'password' => 'password123', 'device_name' => 'pixel',
+        'email' => 'nuevo@example.com', 'password' => 'Zorro-Azul-4821', 'device_name' => 'pixel',
     ])->assertOk()->assertJsonPath('role', 'chofer');
 });
 

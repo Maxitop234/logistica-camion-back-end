@@ -52,7 +52,7 @@ erDiagram
 ## 4. Tablas implementadas ✅
 
 ### `users`
-`id`, `name`, `email` (único), `email_verified_at`, `password` (bcrypt), `remember_token`, `role` (`administrador` \| `chofer` \| `sysadmin`, índice, por defecto `chofer`), `is_active` (bool), columnas de 2FA de Fortify (`two_factor_*`), timestamps.
+`id`, `name`, `email` (único), `email_verified_at`, `password` (bcrypt), `remember_token`, `role` (`administrador` \| `chofer` \| `sysadmin`, índice, por defecto `chofer`), `is_active` (bool), `debe_cambiar_password` (bool), `cuenta_protegida` (bool; cuentas de DemoSeeder), `password_cambiada_en`, columnas de 2FA de Fortify (`two_factor_*`), timestamps.
 
 ### `administradores`
 `id`, `user_id` (único → `users`, cascade), `nombre_completo` (text), `cargo`, `telefono`, timestamps.

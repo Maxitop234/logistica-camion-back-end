@@ -62,6 +62,8 @@ class DemoSeeder extends Seeder
                 'password' => $password,
                 'role' => 'administrador',
                 'is_active' => true,
+                'cuenta_protegida' => true,
+                'debe_cambiar_password' => false,
             ],
         );
 
@@ -118,6 +120,8 @@ class DemoSeeder extends Seeder
                     'password' => $password,
                     'role' => 'chofer',
                     'is_active' => true,
+                    'cuenta_protegida' => true,
+                    'debe_cambiar_password' => false,
                 ],
             );
 

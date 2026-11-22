@@ -29,9 +29,9 @@ Marco de referencia: ISO/IEC 27001/27002, OWASP Top 10 / ASVS / MASVS, TLS 1.2+,
 
 | # | Brecha | Riesgo | Tarea |
 |---|---|---|---|
-| S-01 | **Registro público de Fortify habilitado** (`POST /register`, `Features::registration()`). Cualquiera puede crear un usuario con el rol por defecto `chofer` y luego obtener un token en `/api/v1/auth/login` | Alto | BE-02 |
-| S-02 | Rutas web de Fortify (login, reset, 2FA, passkeys) activas sin uso en la API | Medio | BE-02 |
-| S-03 | Tokens Sanctum sin expiración (`sanctum.expiration = null`) | Medio | BE-02 |
+| S-01 | **Registro público de Fortify habilitado** (`POST /register`, `Features::registration()`). Cualquiera puede crear un usuario con el rol por defecto `chofer` y luego obtener un token en `/api/v1/auth/login` | Alto | Cerrada (2026-11-22) |
+| S-02 | Rutas web de Fortify (login, reset, 2FA, passkeys) activas sin uso en la API | Medio | Cerrada (2026-11-22) |
+| S-03 | Tokens Sanctum sin expiración (`sanctum.expiration = null`) | Medio | Cerrada (2026-11-22) |
 | S-04 | `GET /api/user` devuelve el modelo `User` completo, fuera de `/v1` | Bajo | BE-02 |
 | S-05 | El `motivo` de desactivación de camiones y choferes no queda auditado | Bajo | BE-02 |
 | S-06 | Rotar `APP_KEY` vuelve ilegibles los datos cifrados y cambia los HMAC del RUT | Alto (operación) | Documentado; usar `APP_PREVIOUS_KEYS`. Para el RUT, re-hashear con un comando de mantenimiento |

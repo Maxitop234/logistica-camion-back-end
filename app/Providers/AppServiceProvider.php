@@ -29,6 +29,15 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
 
+        // Recuperación por correo: por IP y por correo, para no usarla como bomba de correos ni adivinar tokens.
+        RateLimiter::for('recuperacion-password', fn (Request $request): array => [
+            Limit::perMinute(5)->by('ip:'.$request->ip()),
+            Limit::perMinute(5)->by('email:'.mb_strtolower((string) $request->input('email'))),
+        ]);
+
+        // Contraseña actual y códigos de la cuenta propia: mismo tope que el login.
+        RateLimiter::for('cuenta-sensible', fn (Request $request): Limit => Limit::perMinute(5)->by('u:'.($request->user()->id ?? $request->ip())));
+
         // Un sensor nuevo prueba el código de su etiqueta: se limita por IP y por hardware.
         RateLimiter::for('iot-vinculacion', fn (Request $request): array => [
             Limit::perMinute((int) config('iot.vinculacion.intentos_por_ip', 10))->by('ip:'.$request->ip()),

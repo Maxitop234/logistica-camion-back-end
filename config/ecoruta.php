@@ -60,4 +60,45 @@ return [
         'umbral_reporte' => (int) env('DESVIO_UMBRAL_REPORTE', 3),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Sesiones (vida de los tokens por rol)
+    |--------------------------------------------------------------------------
+    |
+    | Al vencer, la API responde 401 y la app vuelve al login conservando la
+    | cola offline. El administrador usa una sesión corta; el chofer, larga.
+    |
+    */
+
+    'sesion' => [
+        'administrador_horas' => (int) env('SESION_ADMIN_HORAS', 12),
+        'chofer_dias' => (int) env('SESION_CHOFER_DIAS', 30),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Recuperación de contraseña por correo (solo administradores)
+    |--------------------------------------------------------------------------
+    |
+    | Opcional: solo se ofrece si hay un correo real configurado (MAIL_MAILER
+    | distinto de log/array) y PASSWORD_RESET_EMAIL_ENABLED=true. `frontend_url`
+    | es la base de la app web donde se abre el enlace.
+    |
+    */
+
+    'recuperacion_por_correo' => [
+        'habilitada' => (bool) env('PASSWORD_RESET_EMAIL_ENABLED', false),
+        'frontend_url' => rtrim((string) env('FRONTEND_URL', ''), '/'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Contraseñas
+    |--------------------------------------------------------------------------
+    */
+
+    'password' => [
+        'largo_minimo' => 10,
+    ],
+
 ];

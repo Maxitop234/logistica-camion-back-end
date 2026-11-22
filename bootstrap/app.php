@@ -2,7 +2,9 @@
 
 use App\Http\Middleware\EnsureUserHasRole;
 use App\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\ExigeCambioDePassword;
 use App\Http\Middleware\SoloModoDemo;
+use App\Http\Middleware\SoloModoReal;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -23,6 +25,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => EnsureUserHasRole::class,
             'active' => EnsureUserIsActive::class,
             'demo' => SoloModoDemo::class,
+            'real' => SoloModoReal::class,
+            'cambio' => ExigeCambioDePassword::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -14,6 +14,7 @@ use App\Models\NotificacionChofer;
 use App\Models\Ruta;
 use App\Models\SolicitudReactivacionChofer;
 use App\Models\User;
+use App\Services\Cuentas\GestorDeCuentas;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -22,6 +23,8 @@ use Illuminate\Support\Facades\DB;
 
 class ChoferController extends Controller
 {
+    public function __construct(private readonly GestorDeCuentas $cuentas) {}
+
     /**
      * @var array<int, string>
      */
@@ -50,6 +53,8 @@ class ChoferController extends Controller
                 'email' => $datos['email'],
                 'password' => $datos['password'],
                 'role' => 'chofer',
+                'debe_cambiar_password' => (bool) ($datos['debe_cambiar_password'] ?? true),
+                'password_cambiada_en' => now(),
             ]);
 
             return $user->chofer()->create([
@@ -60,6 +65,11 @@ class ChoferController extends Controller
             ]);
         });
 
+        AuditLog::registrar('chofer_creado', $request->user(), $request, [
+            'chofer_id' => $chofer->id,
+            'debe_cambiar_password' => (bool) ($datos['debe_cambiar_password'] ?? true),
+        ]);
+
         return (new ChoferResource($chofer->fresh()->load(self::RELACIONES)))->response()->setStatusCode(201);
     }
 
@@ -68,8 +78,13 @@ class ChoferController extends Controller
         return new ChoferResource($chofer->load(self::RELACIONES));
     }
 
-    public function update(UpdateChoferRequest $request, Chofer $chofer): ChoferResource
+    public function update(UpdateChoferRequest $request, Chofer $chofer): ChoferResource|JsonResponse
     {
+        $nuevoEmail = $request->validated('email');
+        if ($nuevoEmail !== null && $chofer->user->esCuentaDemoProtegida() && $nuevoEmail !== $chofer->user->email) {
+            return response()->json(['message' => GestorDeCuentas::MENSAJE_DEMO], 403);
+        }
+
         $columnas = [
             'nombre' => 'nombre_cifrado',
             'telefono' => 'telefono_cifrado',
@@ -78,13 +93,45 @@ class ChoferController extends Controller
         ];
 
         $cambios = [];
-        foreach ($request->validated() as $campo => $valor) {
+        foreach ($request->safe()->except('email') as $campo => $valor) {
             $cambios[$columnas[$campo]] = $valor;
         }
 
         $chofer->update($cambios);
 
+        if ($nuevoEmail !== null && $nuevoEmail !== $chofer->user->email) {
+            $anterior = $chofer->user->email;
+            $chofer->user->update(['email' => $nuevoEmail]);
+            $this->cuentas->revocarTokens($chofer->user);
+            AuditLog::registrar('chofer_email_cambiado', $request->user(), $request, [
+                'chofer_id' => $chofer->id,
+                'email_anterior' => $anterior,
+                'email_nuevo' => $nuevoEmail,
+                'sesiones_revocadas' => true,
+            ]);
+        }
+
         return new ChoferResource($chofer->load(self::RELACIONES));
+    }
+
+    /**
+     * Restablece la contraseña del chofer: genera una temporal que se entrega
+     * una sola vez, exige cambiarla al ingresar y cierra sus sesiones abiertas.
+     */
+    public function restablecerPassword(Request $request, Chofer $chofer): JsonResponse
+    {
+        if ($chofer->user->esCuentaDemoProtegida()) {
+            return response()->json(['message' => GestorDeCuentas::MENSAJE_DEMO], 403);
+        }
+
+        $nueva = $this->cuentas->generarPassword();
+        $this->cuentas->fijarPassword($chofer->user, $nueva, true);
+        AuditLog::registrar('chofer_password_restablecida', $request->user(), $request, [
+            'chofer_id' => $chofer->id,
+            'sesiones_revocadas' => true,
+        ]);
+
+        return response()->json(['password' => $nueva, 'debe_cambiar_password' => true]);
     }
 
     /**

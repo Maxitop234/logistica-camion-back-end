@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AdministradorController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CamionController;
 use App\Http\Controllers\Api\V1\ChoferController;
+use App\Http\Controllers\Api\V1\CuentaController;
 use App\Http\Controllers\Api\V1\DesvioController;
 use App\Http\Controllers\Api\V1\DispositivoController;
 use App\Http\Controllers\Api\V1\GeocodificacionController;
@@ -14,6 +16,7 @@ use App\Http\Controllers\Api\V1\NotificacionChoferController;
 use App\Http\Controllers\Api\V1\NotificacionLicenciaController;
 use App\Http\Controllers\Api\V1\PuntoController;
 use App\Http\Controllers\Api\V1\ReactivacionChoferController;
+use App\Http\Controllers\Api\V1\RecuperacionPasswordController;
 use App\Http\Controllers\Api\V1\RutaController;
 use App\Http\Controllers\Api\V1\SectorController;
 use App\Http\Controllers\Api\V1\SolicitudPuntoController;
@@ -27,11 +30,28 @@ Route::get('/user', function (Request $request) {
 
 Route::prefix('v1')->group(function () {
     Route::prefix('auth')->group(function () {
+        Route::get('opciones', [AuthController::class, 'opciones']);
         Route::post('login', [AuthController::class, 'login']);
+        Route::post('dos-pasos/desafio', [AuthController::class, 'desafioDosPasos']);
+
+        // Recuperación por correo (opcional, solo administradores; 404 si no está configurada).
+        Route::post('recuperacion/solicitar', [RecuperacionPasswordController::class, 'solicitar'])
+            ->middleware('throttle:recuperacion-password');
+        Route::post('recuperacion/restablecer', [RecuperacionPasswordController::class, 'restablecer'])
+            ->middleware('throttle:recuperacion-password');
 
         Route::middleware(['auth:sanctum', 'active:permitir_chofer_inactivo'])->group(function () {
             Route::post('logout', [AuthController::class, 'logout']);
             Route::get('me', [AuthController::class, 'me']);
+            Route::post('password', [CuentaController::class, 'cambiarPassword'])->middleware('throttle:cuenta-sensible');
+        });
+
+        // Verificación en dos pasos propia (solo administradores).
+        Route::middleware(['auth:sanctum', 'active', 'cambio', 'role:administrador'])->prefix('dos-pasos')->group(function () {
+            Route::get('/', [CuentaController::class, 'estadoDosPasos']);
+            Route::post('iniciar', [CuentaController::class, 'iniciarDosPasos'])->middleware('throttle:cuenta-sensible');
+            Route::post('confirmar', [CuentaController::class, 'confirmarDosPasos'])->middleware('throttle:cuenta-sensible');
+            Route::delete('/', [CuentaController::class, 'desactivarDosPasos'])->middleware('throttle:cuenta-sensible');
         });
     });
 
@@ -46,13 +66,13 @@ Route::prefix('v1')->group(function () {
         ->middleware('throttle:iot-vinculacion');
 
     // Geocodificación inversa (Nominatim) compartida para administrador y chofer activos.
-    Route::middleware(['auth:sanctum', 'active', 'role:administrador,chofer'])->group(function () {
+    Route::middleware(['auth:sanctum', 'active', 'cambio', 'role:administrador,chofer'])->group(function () {
         Route::get('geocodificacion/inversa', [GeocodificacionController::class, 'inversa'])
             ->middleware('throttle:60,1');
     });
 
     // Endpoints restringidos permitidos a un chofer incluso si su cuenta está desactivada.
-    Route::middleware(['auth:sanctum', 'active:permitir_chofer_inactivo', 'role:chofer'])->prefix('chofer')->group(function () {
+    Route::middleware(['auth:sanctum', 'active:permitir_chofer_inactivo', 'cambio', 'role:chofer'])->prefix('chofer')->group(function () {
         Route::get('estado-cuenta', [ReactivacionChoferController::class, 'estadoCuenta']);
         Route::post('solicitud-reactivacion', [ReactivacionChoferController::class, 'solicitar']);
         Route::get('notificaciones', [NotificacionChoferController::class, 'index']);
@@ -61,7 +81,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // Endpoints operativos del chofer (bloqueados con 403 si está inactivo, sin revocar token).
-    Route::middleware(['auth:sanctum', 'active', 'role:chofer'])->group(function () {
+    Route::middleware(['auth:sanctum', 'active', 'cambio', 'role:chofer'])->group(function () {
         Route::prefix('chofer')->group(function () {
             Route::get('licencia', [LicenciaChoferController::class, 'miLicencia']);
             Route::post('licencia', [LicenciaChoferController::class, 'subir']);
@@ -82,10 +102,24 @@ Route::prefix('v1')->group(function () {
         Route::post('gps/ping', [GpsController::class, 'ping'])->middleware('throttle:120,1');
     });
 
-    Route::middleware(['auth:sanctum', 'active', 'role:administrador'])->group(function () {
+    Route::middleware(['auth:sanctum', 'active', 'cambio', 'role:administrador'])->group(function () {
         Route::apiResource('camiones', CamionController::class)->parameters(['camiones' => 'camion']);
         Route::apiResource('choferes', ChoferController::class)->parameters(['choferes' => 'chofer']);
         Route::post('choferes/{chofer}/reactivar', [ChoferController::class, 'reactivar']);
+        Route::post('choferes/{chofer}/restablecer-password', [ChoferController::class, 'restablecerPassword'])
+            ->middleware('throttle:cuenta-sensible');
+
+        // Gestión de administradores: solo en el ambiente real.
+        Route::middleware('real')->prefix('administradores')->group(function () {
+            Route::get('/', [AdministradorController::class, 'index']);
+            Route::middleware('throttle:cuenta-sensible')->group(function () {
+                Route::post('/', [AdministradorController::class, 'store']);
+                Route::post('{administrador}/restablecer-password', [AdministradorController::class, 'restablecerPassword']);
+                Route::post('{administrador}/desactivar', [AdministradorController::class, 'desactivar']);
+                Route::post('{administrador}/reactivar', [AdministradorController::class, 'reactivar']);
+                Route::delete('{administrador}/dos-pasos', [AdministradorController::class, 'desactivarDosPasos']);
+            });
+        });
 
         Route::apiResource('sectores', SectorController::class)->parameters(['sectores' => 'sector']);
         Route::apiResource('puntos', PuntoController::class)->parameters(['puntos' => 'punto']);
