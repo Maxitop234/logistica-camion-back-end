@@ -1,0 +1,6 @@
+sector,nombre,direccion,coordenadas,tipo_punto,tipo_material,nota
+Sector Prueba Norte,Punto de prueba decimal,Calle Ficticia 100 Temuco,"-38.7400000, -72.6000000",calle,mixto,
+Sector Prueba Norte,Punto de prueba GMS,Calle Ficticia 200 Temuco,"38°45'44.5""S 72°45'42.8""W",condominio,,Junto a un paradero de prueba
+Sector Prueba Sur,Punto de prueba solo dirección,Calle Ficticia 300 Temuco,,,,
+Sector Prueba Sur,Punto de prueba fuera de zona,Calle Ficticia 400,"-33.4500000, -70.6600000",calle,,
+Sector Inexistente,Punto de prueba sin sector,Calle Ficticia 500,"-38.7300000, -72.6000000",calle,,
