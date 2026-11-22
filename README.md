@@ -30,7 +30,8 @@ EcoRuta reemplaza ese proceso por uno basado en datos reales:
 | Autenticación con tokens (Sanctum), roles, auditoría de accesos | ✅ Implementado |
 | CRUD de camiones y choferes (datos personales cifrados) | ✅ Implementado |
 | Sectores (los 12 reales) y puntos de reciclaje: API, zona de operación y vigencia del estado (ADR-0013) | ✅ Implementado (BE-03) |
-| Importación de los puntos reales, sensores IoT, telemetría | ⏳ Pendiente (BE-04 a BE-06) |
+| Importación de los sectores y puntos reales desde CSV (`sectores:importar`, `puntos:importar`) | 🔄 En progreso (BE-04: comandos listos, falta confirmar datos con la empresa) |
+| Sensores IoT, telemetría | ⏳ Pendiente (BE-05, BE-06) |
 | GPS en vivo, administración de GPS, consumo de comunicaciones | ⏳ Pendiente (BE-07 a BE-09) |
 | Motor de rutas y ciclo de vida de la ruta | ⏳ Pendiente (BE-10, BE-11) |
 | Validación de licencias de conducir | ⏳ Pendiente (BE-12) |
@@ -175,6 +176,20 @@ vendor/bin/sail artisan db:seed --class=SectorSeeder
 > **Puntos creados antes de BE-03:** la migración reemplaza la antigua columna de texto `puntos.sector` (5 sectores inventados) por `sector_id`. Los puntos que ya existían quedan sin sector y marcados para revisión (`requiere_revision = true`) hasta que se les asigne uno.
 
 > **Si ya tenías el entorno levantado antes de PostGIS:** recrea el contenedor de la base con `vendor/bin/sail up -d --force-recreate pgsql` y ejecuta `vendor/bin/sail artisan migrate`. El volumen de datos se conserva (la imagen sigue siendo Alpine y PostgreSQL 18). La imagen `postgis/postgis` solo se publica para amd64; en equipos ARM corre emulada.
+
+### Cargar los puntos reales
+
+La planilla del equipo (`puntos_reciclaje_temuco.csv`) no se commitea: cópiala en `storage/app/private/importaciones/`, que Git ignora. Primero revisa el resultado con `--dry-run` y después importa sin esa opción:
+
+```bash
+vendor/bin/sail artisan sectores:importar storage/app/private/importaciones/puntos_reciclaje_temuco.csv --dry-run
+```
+
+```bash
+vendor/bin/sail artisan puntos:importar storage/app/private/importaciones/puntos_reciclaje_temuco.csv --dry-run
+```
+
+Los dos comandos son repetibles: reimportar actualiza los datos sin duplicar puntos. `puntos:importar` termina con una conciliación por sector frente a `puntos_esperados`. El formato del archivo y las reglas están en [`tasks/BE-04-importacion-de-puntos-reales.md`](tasks/BE-04-importacion-de-puntos-reales.md).
 
 ## 6. Comandos frecuentes
 
