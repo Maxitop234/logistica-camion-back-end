@@ -83,7 +83,7 @@ test('la ingesta acepta X-IoT-Token y Bearer, rechaza dispositivos desactivados 
 });
 
 test('la migracion de datos convierte el token por punto en un dispositivo con el mismo hash', function () {
-    $migracion = require database_path('migrations/2026_11_23_100000_create_dispositivos_table.php');
+    $migracion = require database_path('migrations/2026_11_22_200000_create_dispositivos_table.php');
     $punto = Punto::factory()->create(['sensor_codigo' => 'ESP32-VIEJO', 'sensor_token_hash' => Punto::hashSensorToken('token_viejo')]);
 
     $metodo = new ReflectionMethod($migracion, 'migrarTokensPorPunto');
