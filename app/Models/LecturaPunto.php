@@ -11,6 +11,8 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property int $punto_id
+ * @property int|null $dispositivo_id
+ * @property int|null $rssi_dbm
  * @property string|null $lectura_uuid
  * @property string $origen
  * @property string|null $distancia_cm
@@ -25,6 +27,8 @@ use Illuminate\Support\Carbon;
 #[Table('lecturas_puntos')]
 #[Fillable([
     'punto_id',
+    'dispositivo_id',
+    'rssi_dbm',
     'lectura_uuid',
     'origen',
     'distancia_cm',

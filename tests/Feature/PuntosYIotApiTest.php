@@ -105,15 +105,9 @@ test('ingesta ESP32 autentica por token de sensor, calcula porcentaje por distan
         ->postJson('/api/v1/iot/lecturas', ['distancia_cm' => 24])
         ->assertUnauthorized();
 
-    // Admin genera token de sensor (devuelto una sola vez, guardado como hash).
-    $tokenResp = $this->actingAs($this->admin, 'sanctum')
-        ->postJson("/api/v1/puntos/{$punto->id}/sensor-token")
-        ->assertOk()
-        ->assertJsonPath('data.endpoint_iot', '/api/v1/iot/lecturas');
-
-    $token = $tokenResp->json('data.token');
-    expect($token)->toStartWith('eco_iot_');
-    expect($punto->fresh()->sensor_token_hash)->toBe(Punto::hashSensorToken($token));
+    // Compatibilidad: un token por punto anterior a los dispositivos sigue funcionando.
+    $token = 'eco_iot_token_antiguo_por_punto';
+    $punto->update(['sensor_token_hash' => Punto::hashSensorToken($token)]);
 
     // Fórmula ultrasónica: altura 120 cm, distancia 24 cm -> (120 - 24) / 120 * 100 = 80 % -> alto.
     $uuid = 'esp32-lectura-001';
@@ -145,6 +139,14 @@ test('ingesta ESP32 autentica por token de sensor, calcula porcentaje por distan
         ->assertJsonPath('duplicada', true);
 
     expect(LecturaPunto::where('punto_id', $punto->id)->count())->toBe(1);
+
+    // La simulación desde el admin solo existe en modo demostración.
+    config(['app.demo_mode' => false]);
+    $this->actingAs($this->admin, 'sanctum')
+        ->postJson("/api/v1/puntos/{$punto->id}/simular-lectura", ['distancia_cm' => 6])
+        ->assertForbidden();
+
+    config(['app.demo_mode' => true]);
 
     // Simulación IoT desde el admin usa exactamente el mismo cálculo: distancia 6 cm -> 95 % -> lleno.
     $this->actingAs($this->admin, 'sanctum')

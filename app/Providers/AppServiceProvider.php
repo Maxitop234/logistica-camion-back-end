@@ -3,8 +3,11 @@
 namespace App\Providers;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -25,6 +28,13 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+
+        // Un sensor nuevo prueba el código de su etiqueta: se limita por IP y por hardware.
+        RateLimiter::for('iot-vinculacion', fn (Request $request): array => [
+            Limit::perMinute((int) config('iot.vinculacion.intentos_por_ip', 10))->by('ip:'.$request->ip()),
+            Limit::perMinute((int) config('iot.vinculacion.intentos_por_hardware', 20))
+                ->by('hw:'.mb_strtolower((string) $request->input('codigo_hardware'))),
+        ]);
     }
 
     /**

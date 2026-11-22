@@ -3,54 +3,43 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Punto\StoreIotLecturaRequest;
 use App\Http\Resources\LecturaPuntoResource;
 use App\Http\Resources\PuntoResource;
-use App\Models\Punto;
-use App\Services\PuntoTelemetryService;
+use App\Models\Dispositivo;
+use App\Services\Iot\IotException;
+use App\Services\Iot\RecepcionDeLecturas;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Carbon;
+use Illuminate\Http\Request;
 
 class IotLecturaController extends Controller
 {
     /**
-     * Endpoint de ingesta para sensores físicos ESP32 (JSN-SR04T / HC-SR04).
-     * Se autentica mediante `Authorization: Bearer <sensor_token>` contra
-     * `puntos.sensor_token_hash`, sin usar cuentas humanas.
+     * Ingesta de lecturas del sensor (ESP32 + ultrasónico). Se autentica con el
+     * token propio del dispositivo en `X-IoT-Token` (o `Authorization: Bearer`),
+     * sin cuentas humanas (ADR-0012). Un token por punto anterior sigue valiendo.
      */
-    public function store(StoreIotLecturaRequest $request, PuntoTelemetryService $telemetry): JsonResponse
+    public function store(Request $request, RecepcionDeLecturas $recepcion): JsonResponse
     {
-        $token = $request->bearerToken();
-        if (! is_string($token) || trim($token) === '') {
-            return response()->json(['message' => 'Token de sensor requerido.'], 401);
+        $token = $request->header('X-IoT-Token') ?: $request->bearerToken();
+
+        try {
+            $resultado = $recepcion->recibir(is_string($token) ? $token : null, $request->all());
+        } catch (IotException $e) {
+            return response()->json(['message' => $e->getMessage()], $e->estado);
         }
 
-        $punto = Punto::where('sensor_token_hash', Punto::hashSensorToken($token))->first();
-        if (! $punto instanceof Punto) {
-            return response()->json(['message' => 'Token de sensor inválido.'], 401);
-        }
-
-        if (! $punto->activo) {
-            return response()->json(['message' => 'El punto asociado a este sensor está inactivo.'], 403);
-        }
-
-        $datos = $request->validated();
-        $medidoEn = isset($datos['medido_en']) ? Carbon::parse((string) $datos['medido_en']) : null;
-
-        $resultado = $telemetry->registrarLectura(
-            punto: $punto,
-            origen: Punto::ORIGEN_SENSOR_IOT,
-            distanciaCm: isset($datos['distancia_cm']) ? (float) $datos['distancia_cm'] : null,
-            porcentajeDirecto: isset($datos['porcentaje_llenado']) ? (int) $datos['porcentaje_llenado'] : null,
-            bateriaVoltaje: isset($datos['bateria_voltaje']) ? (float) $datos['bateria_voltaje'] : null,
-            medidoEn: $medidoEn,
-            lecturaUuid: $datos['lectura_uuid'] ?? null,
-        );
+        $dispositivo = $resultado['dispositivo'];
 
         return response()->json([
-            'data' => (new PuntoResource($resultado['punto']))->resolve(),
-            'lectura' => (new LecturaPuntoResource($resultado['lectura']))->resolve(),
+            'data' => $resultado['punto'] !== null ? (new PuntoResource($resultado['punto']))->resolve() : null,
+            'lectura' => $resultado['lectura'] !== null ? (new LecturaPuntoResource($resultado['lectura']))->resolve() : null,
+            'valida' => $resultado['valida'],
+            'motivo_invalido' => $resultado['motivo_invalido'],
             'duplicada' => $resultado['duplicada'],
+            'configuracion' => $dispositivo instanceof Dispositivo ? [
+                'intervalo_lectura_seg' => $dispositivo->intervalo_lectura_seg,
+            ] : null,
+            'hora_servidor' => now()->utc()->toIso8601String(),
         ], $resultado['duplicada'] ? 200 : 201);
     }
 }

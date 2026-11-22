@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CamionController;
 use App\Http\Controllers\Api\V1\ChoferController;
 use App\Http\Controllers\Api\V1\DesvioController;
+use App\Http\Controllers\Api\V1\DispositivoController;
 use App\Http\Controllers\Api\V1\GeocodificacionController;
 use App\Http\Controllers\Api\V1\GpsController;
 use App\Http\Controllers\Api\V1\IotLecturaController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\Api\V1\ReactivacionChoferController;
 use App\Http\Controllers\Api\V1\RutaController;
 use App\Http\Controllers\Api\V1\SectorController;
 use App\Http\Controllers\Api\V1\SolicitudPuntoController;
+use App\Http\Controllers\Api\V1\VinculacionIotController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -36,6 +38,12 @@ Route::prefix('v1')->group(function () {
     // Ingesta IoT desde hardware ESP32 autenticado por token de sensor (sin cuenta humana).
     Route::post('iot/lecturas', [IotLecturaController::class, 'store'])
         ->middleware('throttle:120,1');
+
+    // Vinculación del sensor con el código de su etiqueta (anuncio y retiro único del token).
+    Route::post('iot/vinculacion/anunciar', [VinculacionIotController::class, 'anunciar'])
+        ->middleware('throttle:iot-vinculacion');
+    Route::post('iot/vinculacion/estado', [VinculacionIotController::class, 'estado'])
+        ->middleware('throttle:iot-vinculacion');
 
     // Geocodificación inversa (Nominatim) compartida para administrador y chofer activos.
     Route::middleware(['auth:sanctum', 'active', 'role:administrador,chofer'])->group(function () {
@@ -82,8 +90,20 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('sectores', SectorController::class)->parameters(['sectores' => 'sector']);
         Route::apiResource('puntos', PuntoController::class)->parameters(['puntos' => 'punto']);
         Route::post('puntos/{punto}/reactivar', [PuntoController::class, 'reactivar']);
-        Route::post('puntos/{punto}/sensor-token', [PuntoController::class, 'generarTokenSensor']);
-        Route::post('puntos/{punto}/simular-lectura', [PuntoController::class, 'simularLecturaIot']);
+        Route::post('puntos/{punto}/simular-lectura', [PuntoController::class, 'simularLecturaIot'])->middleware('demo');
+
+        // Sensores IoT: vinculación sin manejar tokens, calibración y diagnóstico.
+        Route::post('dispositivos/aprobar', [DispositivoController::class, 'aprobar']);
+        Route::post('dispositivos/simulador/completar', [DispositivoController::class, 'completarSimulador'])->middleware('demo');
+        Route::get('dispositivos', [DispositivoController::class, 'index']);
+        Route::get('dispositivos/{dispositivo}', [DispositivoController::class, 'show']);
+        Route::patch('dispositivos/{dispositivo}', [DispositivoController::class, 'update']);
+        Route::post('dispositivos/{dispositivo}/desvincular', [DispositivoController::class, 'desvincular']);
+        Route::post('dispositivos/{dispositivo}/mover', [DispositivoController::class, 'mover']);
+        Route::post('dispositivos/{dispositivo}/desactivar', [DispositivoController::class, 'desactivar']);
+        Route::post('dispositivos/{dispositivo}/reactivar', [DispositivoController::class, 'reactivar']);
+        Route::post('dispositivos/{dispositivo}/rotar-token', [DispositivoController::class, 'rotarToken']);
+        Route::post('dispositivos/{dispositivo}/calibrar-vacio', [DispositivoController::class, 'calibrarVacio']);
 
         Route::get('rutas', [RutaController::class, 'index']);
         Route::post('rutas/generar', [RutaController::class, 'generar']);

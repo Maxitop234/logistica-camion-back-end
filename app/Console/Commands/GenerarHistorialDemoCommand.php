@@ -5,6 +5,8 @@ namespace App\Console\Commands;
 use App\Models\Administrador;
 use App\Models\Camion;
 use App\Models\Chofer;
+use App\Models\Dispositivo;
+use App\Models\LecturaInvalida;
 use App\Models\LecturaPunto;
 use App\Models\ProyeccionFlota;
 use App\Models\Punto;
@@ -35,10 +37,10 @@ class GenerarHistorialDemoCommand extends Command
     private const PUNTOS_SOBREDIMENSIONADOS = ['Sector Santa Rosa', 'Sector Pedro de Valdivia', 'Pulmahue Padre Las Casas'];
 
     /** @var array<int, string> */
-    private const SENSORES_SIN_REPORTE = ['Sector Pueblo Nuevo', 'Sector Santa Rosa'];
+    public const SENSORES_SIN_REPORTE = ['Sector Pueblo Nuevo', 'Sector Santa Rosa'];
 
     /** @var array<int, string> */
-    private const SENSORES_BATERIA_BAJA = ['Parque Estadio Germán Becker', 'Municipalidad de Padre Las Casas'];
+    public const SENSORES_BATERIA_BAJA = ['Parque Estadio Germán Becker', 'Municipalidad de Padre Las Casas'];
 
     public function handle(): int
     {
@@ -89,6 +91,7 @@ class GenerarHistorialDemoCommand extends Command
             RutaPunto::query()->delete();
             Ruta::query()->delete();
             LecturaPunto::query()->delete();
+            LecturaInvalida::query()->delete();
             ProyeccionFlota::query()->delete();
 
             // Ajustar alta de camiones al inicio del período para reflejar días arrendados completos.
@@ -479,6 +482,8 @@ class GenerarHistorialDemoCommand extends Command
                     'ultimo_heartbeat_iot' => $tieneSensor ? $ultimoMedido : null,
                 ])->saveQuietly();
 
+                $this->sincronizarSensorSimulado($punto, $pctActual, $distActual, $voltaje, $ultimoMedido, $esOffline, $esBateriaBaja, $ahora);
+
                 if (count($lecturasBuffer) >= 400) {
                     LecturaPunto::query()->insert($lecturasBuffer);
                     $lecturasBuffer = [];
@@ -545,5 +550,43 @@ class GenerarHistorialDemoCommand extends Command
             substr($hex, 17, 3),
             substr($hex, 20, 12),
         );
+    }
+
+    /**
+     * Deja el sensor simulado del punto coherente con el historial: última lectura,
+     * batería y perfil (corte largo, batería baja). Desde ahí el simulador continúa.
+     */
+    private function sincronizarSensorSimulado(
+        Punto $punto,
+        int $porcentaje,
+        float $distancia,
+        ?float $voltaje,
+        Carbon $ultimoMedido,
+        bool $sinReporte,
+        bool $bateriaBaja,
+        Carbon $ahora,
+    ): void {
+        $dispositivo = Dispositivo::query()->where('punto_id', $punto->id)->where('es_simulado', true)->first();
+        if (! $dispositivo instanceof Dispositivo) {
+            return;
+        }
+
+        $sim = $dispositivo->simulacion ?? [];
+        $sim['nivel_inicial'] = $porcentaje;
+        $sim['ancla_en'] = $ultimoMedido->toIso8601String();
+        $sim['perfil'] = $bateriaBaja ? 'bateria_baja' : 'normal';
+        $sim['desconectado_hasta'] = $sinReporte ? $ahora->copy()->addDays(2)->toIso8601String() : null;
+        if ($voltaje !== null) {
+            $sim['voltaje_inicial'] = $voltaje;
+        }
+
+        $dispositivo->forceFill([
+            'simulacion' => $sim,
+            'ultima_conexion_en' => $ultimoMedido,
+            'ultima_lectura_en' => $ultimoMedido,
+            'ultima_distancia_cm' => $distancia,
+            'bateria_voltaje' => $voltaje,
+            'lecturas_invalidas_seguidas' => 0,
+        ])->save();
     }
 }

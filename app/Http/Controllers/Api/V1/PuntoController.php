@@ -13,6 +13,7 @@ use App\Models\AuditLog;
 use App\Models\Punto;
 use App\Models\Ruta;
 use App\Models\RutaPunto;
+use App\Services\Iot\SimuladorDeSensores;
 use App\Services\Puntos\AsignadorDeSector;
 use App\Services\PuntoTelemetryService;
 use Illuminate\Database\Eloquent\Builder;
@@ -21,7 +22,6 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class PuntoController extends Controller
 {
@@ -34,6 +34,8 @@ class PuntoController extends Controller
      */
     public function index(ListarPuntosRequest $request): AnonymousResourceCollection
     {
+        SimuladorDeSensores::completarSiDemo();
+
         $query = Punto::query()
             ->orderByDesc('activo')
             ->orderByRaw('porcentaje_llenado IS NULL')
@@ -95,6 +97,8 @@ class PuntoController extends Controller
      */
     public function indexChofer(): AnonymousResourceCollection
     {
+        SimuladorDeSensores::completarSiDemo();
+
         $puntos = Punto::where('activo', true)
             ->orderByRaw('porcentaje_llenado IS NULL')
             ->orderByDesc('porcentaje_llenado')
@@ -283,44 +287,9 @@ class PuntoController extends Controller
     }
 
     /**
-     * Genera o rota el token Bearer del sensor ESP32 (devuelto en plano UNA sola vez).
-     */
-    public function generarTokenSensor(Request $request, Punto $punto): JsonResponse
-    {
-        $tokenPlano = 'eco_iot_'.Str::random(40);
-        $codigo = is_string($punto->sensor_codigo) && trim($punto->sensor_codigo) !== ''
-            ? $punto->sensor_codigo
-            : sprintf('ESP32-P%03d', $punto->id);
-
-        $punto->update([
-            'sensor_codigo' => $codigo,
-            'sensor_token_hash' => Punto::hashSensorToken($tokenPlano),
-        ]);
-
-        AuditLog::registrar('punto_sensor_token_generado', $request->user(), $request, [
-            'punto_id' => $punto->id,
-            'sensor_codigo' => $codigo,
-        ]);
-
-        return response()->json([
-            'data' => [
-                'token' => $tokenPlano,
-                'sensor_codigo' => $codigo,
-                'endpoint_iot' => '/api/v1/iot/lecturas',
-                'ejemplo_payload' => [
-                    'distancia_cm' => 30.0,
-                    'bateria_voltaje' => 3.92,
-                    'lectura_uuid' => Str::uuid()->toString(),
-                    'medido_en' => now()->toIso8601String(),
-                ],
-                'punto' => (new PuntoResource($punto->fresh()))->resolve(),
-            ],
-        ]);
-    }
-
-    /**
      * Permite al administrador simular una lectura IoT pasando por el mismo
      * cálculo ultrasónico real del ESP32 para probar calibración y estados.
+     * Solo existe con `APP_DEMO_MODE=true` (middleware `demo`).
      */
     public function simularLecturaIot(
         StoreIotLecturaRequest $request,

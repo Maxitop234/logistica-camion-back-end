@@ -82,7 +82,7 @@ test('un chofer recibe 403 en todos los endpoints de puntos del administrador', 
         ['putJson', "/api/v1/puntos/{$punto->id}"],
         ['deleteJson', "/api/v1/puntos/{$punto->id}"],
         ['postJson', "/api/v1/puntos/{$punto->id}/reactivar"],
-        ['postJson', "/api/v1/puntos/{$punto->id}/sensor-token"],
+        ['postJson', '/api/v1/dispositivos/aprobar'],
         ['postJson', "/api/v1/puntos/{$punto->id}/simular-lectura"],
     ];
 

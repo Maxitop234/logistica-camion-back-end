@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Dispositivo;
 use App\Models\Punto;
 use App\Models\Ruta;
 use App\Models\RutaPunto;
@@ -99,10 +100,108 @@ class KpiAlertasService
             }
         }
 
-        // 3. Salud de sensores IoT (reciente < 8 h y batería ≥ 3,40 V, KPI-08).
+        // 3. Salud de sensores IoT (dispositivos vinculados; KPI-08).
+        $alertas = [...$alertas, ...$this->alertasDeDispositivos(), ...$this->alertasDePuntosSinDispositivo()];
+
+        $pesoSeveridad = ['alta' => 0, 'media' => 1, 'baja' => 2];
+        usort($alertas, static fn (array $a, array $b): int => ($pesoSeveridad[$a['severidad']] ?? 2) <=> ($pesoSeveridad[$b['severidad']] ?? 2));
+
+        return $alertas;
+    }
+
+    /**
+     * Sensores vinculados: sin reportar más de N intervalos, batería baja, lecturas
+     * inválidas repetidas y sensores nuevos esperando aprobación.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function alertasDeDispositivos(): array
+    {
+        $alertas = [];
+        $umbralInvalidas = max(1, (int) config('iot.invalidas_para_alerta', 3));
+
+        $dispositivos = Dispositivo::query()->with('punto')->where('estado', '!=', Dispositivo::ESTADO_DESACTIVADO)->orderBy('id')->get();
+        foreach ($dispositivos as $dispositivo) {
+            $nombre = $dispositivo->punto instanceof Punto ? $dispositivo->punto->nombre : $dispositivo->codigo_hardware;
+
+            if ($dispositivo->estado === Dispositivo::ESTADO_PENDIENTE) {
+                $alertas[] = [
+                    'id' => "sensor-pendiente-{$dispositivo->id}",
+                    'tipo' => 'sensor_pendiente',
+                    'severidad' => 'baja',
+                    'titulo' => "Sensor nuevo por vincular: {$dispositivo->codigo_hardware}",
+                    'detalle' => 'Se anunció y espera que un administrador lo apruebe y elija su punto.',
+                    'recomendacion' => 'Ingresa el código de la etiqueta en Sensores para vincularlo.',
+                    'kpi' => 'KPI-08',
+                    'gravedad' => 1.0,
+                ];
+
+                continue;
+            }
+
+            if ($dispositivo->sinReportar()) {
+                $minutos = $dispositivo->minutosSinReportar();
+                $horas = $minutos === null ? null : round($minutos / 60, 1);
+                $limite = max(1, (int) config('iot.intervalos_sin_reporte', 2));
+                $alertas[] = [
+                    'id' => 'sensor-sin-reporte-'.($dispositivo->punto_id ?? "d{$dispositivo->id}"),
+                    'tipo' => 'sensor_sin_reporte',
+                    'severidad' => 'alta',
+                    'titulo' => "Sensor de {$nombre} sin reportar",
+                    'detalle' => ($horas === null
+                        ? 'El sensor vinculado aún no envía su primera lectura'
+                        : 'No envía lecturas hace '.number_format($horas, 1, ',', '.').' h')
+                        ." (más de {$limite} intervalos de ".intdiv($dispositivo->intervalo_lectura_seg, 60).' min).',
+                    'recomendacion' => 'Revisar conectividad o alimentación del ESP32 en terreno.',
+                    'kpi' => 'KPI-08',
+                    'gravedad' => $horas ?? 9999.0,
+                ];
+            }
+
+            if ($dispositivo->bateriaBaja()) {
+                $volt = number_format((float) $dispositivo->bateria_voltaje, 2, ',', '.');
+                $minimo = (float) config('iot.bateria_minima_v', 3.40);
+                $alertas[] = [
+                    'id' => 'bateria-baja-'.($dispositivo->punto_id ?? "d{$dispositivo->id}"),
+                    'tipo' => 'bateria_baja',
+                    'severidad' => 'media',
+                    'titulo' => "Batería baja en {$nombre} ({$volt} V)",
+                    'detalle' => 'Está bajo el mínimo recomendado de '.number_format($minimo, 2, ',', '.').' V.',
+                    'recomendacion' => 'Programar cambio o recarga de batería en la próxima visita.',
+                    'kpi' => 'KPI-08',
+                    'gravedad' => round($minimo - (float) $dispositivo->bateria_voltaje, 2),
+                ];
+            }
+
+            if ($dispositivo->lecturas_invalidas_seguidas >= $umbralInvalidas) {
+                $alertas[] = [
+                    'id' => "lecturas-invalidas-{$dispositivo->id}",
+                    'tipo' => 'lecturas_invalidas',
+                    'severidad' => 'media',
+                    'titulo' => "Lecturas inválidas repetidas en {$nombre}",
+                    'detalle' => "El sensor envió {$dispositivo->lecturas_invalidas_seguidas} lecturas imposibles seguidas (sin eco, zona ciega o fuera de rango).",
+                    'recomendacion' => 'Revisar la orientación del sensor, obstáculos delante o humedad en el módulo; recalibrar si cambió el contenedor.',
+                    'kpi' => 'KPI-08',
+                    'gravedad' => (float) $dispositivo->lecturas_invalidas_seguidas,
+                ];
+            }
+        }
+
+        return $alertas;
+    }
+
+    /**
+     * Puntos con sensor registrado antes de los dispositivos (umbral fijo de 8 h).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function alertasDePuntosSinDispositivo(): array
+    {
+        $alertas = [];
         $ahora = now();
         $puntosConSensor = Punto::query()
             ->where('activo', true)
+            ->whereDoesntHave('dispositivo')
             ->where(static function ($q): void {
                 $q->whereNotNull('sensor_codigo')->orWhereNotNull('sensor_token_hash');
             })
@@ -143,9 +242,6 @@ class KpiAlertasService
                 ];
             }
         }
-
-        $pesoSeveridad = ['alta' => 0, 'media' => 1, 'baja' => 2];
-        usort($alertas, static fn (array $a, array $b): int => ($pesoSeveridad[$a['severidad']] ?? 2) <=> ($pesoSeveridad[$b['severidad']] ?? 2));
 
         return $alertas;
     }

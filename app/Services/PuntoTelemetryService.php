@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Dispositivo;
 use App\Models\LecturaPunto;
 use App\Models\Punto;
 use App\Models\User;
@@ -27,6 +28,9 @@ class PuntoTelemetryService
         ?CarbonInterface $medidoEn = null,
         ?string $lecturaUuid = null,
         ?User $registradaPor = null,
+        ?Dispositivo $dispositivo = null,
+        ?int $rssiDbm = null,
+        ?CarbonInterface $recibidoEn = null,
     ): array {
         if (is_string($lecturaUuid) && $lecturaUuid !== '') {
             $existente = LecturaPunto::where('lectura_uuid', $lecturaUuid)->first();
@@ -40,9 +44,10 @@ class PuntoTelemetryService
         }
 
         $alturaCm = (float) ($punto->altura_contenedor_cm ?: 120.0);
-        $porcentaje = $distanciaCm !== null
-            ? Punto::porcentajeDesdeDistancia($distanciaCm, $alturaCm)
-            : max(0, min(100, (int) ($porcentajeDirecto ?? 0)));
+        // Con dispositivo, el porcentaje ya viene calculado con su calibración.
+        $porcentaje = $porcentajeDirecto !== null
+            ? max(0, min(100, $porcentajeDirecto))
+            : ($distanciaCm !== null ? Punto::porcentajeDesdeDistancia($distanciaCm, $alturaCm) : 0);
 
         $estado = Punto::clasificarEstado($porcentaje);
         $momento = $medidoEn ?? now();
@@ -57,6 +62,9 @@ class PuntoTelemetryService
             $momento,
             $lecturaUuid,
             $registradaPor,
+            $dispositivo,
+            $rssiDbm,
+            $recibidoEn,
         ): LecturaPunto {
             $nueva = $punto->lecturas()->create([
                 'lectura_uuid' => $lecturaUuid,
@@ -66,24 +74,36 @@ class PuntoTelemetryService
                 'estado_llenado' => $estado,
                 'bateria_voltaje' => $bateriaVoltaje,
                 'registrada_por_user_id' => $registradaPor?->id,
+                'dispositivo_id' => $dispositivo?->id,
+                'rssi_dbm' => $rssiDbm,
                 'medido_en' => $momento,
             ]);
 
-            $actualizacion = [
-                'porcentaje_llenado' => $porcentaje,
-                'estado_llenado' => $estado,
-                'origen_actualizacion' => $origen,
-                'ultima_actualizacion_estado' => $momento,
-            ];
+            // Una lectura atrasada (buffer sin conexión) no pisa un estado más reciente.
+            $esMasReciente = $dispositivo === null
+                || $punto->ultima_actualizacion_estado === null
+                || $momento->greaterThanOrEqualTo($punto->ultima_actualizacion_estado);
+
+            $actualizacion = [];
+            if ($esMasReciente) {
+                $actualizacion = [
+                    'porcentaje_llenado' => $porcentaje,
+                    'estado_llenado' => $estado,
+                    'origen_actualizacion' => $origen,
+                    'ultima_actualizacion_estado' => $momento,
+                ];
+            }
 
             if ($origen === Punto::ORIGEN_SENSOR_IOT) {
-                $actualizacion['ultimo_heartbeat_iot'] = now();
+                $actualizacion['ultimo_heartbeat_iot'] = $recibidoEn ?? now();
                 if ($bateriaVoltaje !== null) {
                     $actualizacion['bateria_voltaje'] = $bateriaVoltaje;
                 }
             }
 
-            $punto->update($actualizacion);
+            if ($actualizacion !== []) {
+                $punto->update($actualizacion);
+            }
 
             return $nueva;
         });

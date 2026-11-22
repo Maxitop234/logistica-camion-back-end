@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -279,6 +280,14 @@ class Punto extends Model
     public function sectorResuelto(): string
     {
         return $this->sector instanceof Sector ? $this->sector->nombre : self::SIN_SECTOR;
+    }
+
+    /**
+     * @return HasOne<Dispositivo, $this>
+     */
+    public function dispositivo(): HasOne
+    {
+        return $this->hasOne(Dispositivo::class);
     }
 
     /**

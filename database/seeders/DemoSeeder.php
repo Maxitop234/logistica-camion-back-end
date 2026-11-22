@@ -2,12 +2,15 @@
 
 namespace Database\Seeders;
 
+use App\Console\Commands\GenerarHistorialDemoCommand;
 use App\Models\Administrador;
 use App\Models\Camion;
 use App\Models\Chofer;
+use App\Models\Dispositivo;
 use App\Models\Punto;
 use App\Models\Sector;
 use App\Models\User;
+use App\Services\Iot\SimuladorDeSensores;
 use Illuminate\Database\Seeder;
 use RuntimeException;
 
@@ -46,7 +49,7 @@ class DemoSeeder extends Seeder
         $choferes = $this->crearChoferesDemo($choferPassword, $admin->user_id);
         $this->crearCamionesDemo($choferes);
         $this->call(SectorSeeder::class);
-        $this->crearPuntosDemo();
+        $this->crearPuntosDemo($admin->user);
     }
 
     private function crearAdministradorDemo(string $email, string $password): Administrador
@@ -164,7 +167,7 @@ class DemoSeeder extends Seeder
         }
     }
 
-    private function crearPuntosDemo(): void
+    private function crearPuntosDemo(User $admin): void
     {
         // 16 puntos en direcciones reales y únicas de Temuco y Padre Las Casas, sin
         // direcciones repetidas, asignados al sector real con el punto más cercano.
@@ -200,9 +203,10 @@ class DemoSeeder extends Seeder
         $sectorIds = Sector::query()->pluck('id', 'nombre');
 
         $ahora = now();
+        $simulador = app(SimuladorDeSensores::class);
         foreach ($puntos as [$nombre, $direccion, $tipo, $sector, $lat, $lng, $porcentaje, $sensorCodigo]) {
             $tieneSensor = $sensorCodigo !== null;
-            Punto::updateOrCreate(
+            $punto = Punto::updateOrCreate(
                 ['nombre' => $nombre],
                 [
                     'nombre_automatico' => false,
@@ -217,12 +221,18 @@ class DemoSeeder extends Seeder
                     'ultima_actualizacion_estado' => $ahora,
                     'origen_actualizacion' => $tieneSensor ? Punto::ORIGEN_SENSOR_IOT : Punto::ORIGEN_MANUAL,
                     'altura_contenedor_cm' => 120.0,
-                    'sensor_codigo' => $sensorCodigo,
-                    'bateria_voltaje' => $tieneSensor ? 3.85 : null,
-                    'ultimo_heartbeat_iot' => $tieneSensor ? $ahora->copy()->subMinutes(20) : null,
                     'activo' => true,
                 ],
             );
+
+            // Los sensores de la demo se vinculan con el mismo flujo que uno físico.
+            if ($tieneSensor && ! Dispositivo::where('codigo_hardware', $sensorCodigo)->exists()) {
+                $simulador->aprovisionar($sensorCodigo, $punto, $admin, [
+                    'nivel_inicial' => $porcentaje,
+                    'perfil' => in_array($nombre, GenerarHistorialDemoCommand::SENSORES_BATERIA_BAJA, true) ? 'bateria_baja' : 'normal',
+                    'desconectado_hasta' => in_array($nombre, GenerarHistorialDemoCommand::SENSORES_SIN_REPORTE, true) ? $ahora->copy()->addDays(2) : null,
+                ]);
+            }
         }
     }
 }

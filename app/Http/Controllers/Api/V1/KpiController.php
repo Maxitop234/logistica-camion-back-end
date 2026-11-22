@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Kpi\UpdateParametrosRequest;
 use App\Models\AuditLog;
 use App\Models\ParametroOperativo;
+use App\Services\Iot\SimuladorDeSensores;
 use App\Services\KpiAlertasService;
 use App\Services\KpiCalculatorService;
 use App\Services\KpiExportService;
@@ -28,6 +29,7 @@ class KpiController extends Controller
      */
     public function dashboard(Request $request): JsonResponse
     {
+        SimuladorDeSensores::completarSiDemo();
         [$inicio, $fin, $agrupacion] = $this->resolverFiltro($request);
 
         return response()->json([
@@ -40,6 +42,7 @@ class KpiController extends Controller
      */
     public function alertas(Request $request): JsonResponse
     {
+        SimuladorDeSensores::completarSiDemo();
         [$inicio, $fin] = $this->resolverFiltro($request);
 
         return response()->json([

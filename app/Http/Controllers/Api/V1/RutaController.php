@@ -14,6 +14,7 @@ use App\Models\Ruta;
 use App\Models\RutaPunto;
 use App\Services\Desvios\DetectorDeDesvios;
 use App\Services\GpsTelemetryService;
+use App\Services\Iot\SimuladorDeSensores;
 use App\Services\OsmRouteOptimizerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -231,7 +232,9 @@ class RutaController extends Controller
 
         $recolecciones = $request->validated('recolecciones');
 
-        DB::transaction(function () use ($ruta, $recolecciones): void {
+        $vaciados = [];
+
+        DB::transaction(function () use ($ruta, $recolecciones, &$vaciados): void {
             foreach ($recolecciones as $item) {
                 $yaRegistrado = RutaPunto::where('sync_uuid', $item['sync_uuid'])->exists();
                 if ($yaRegistrado) {
@@ -269,8 +272,16 @@ class RutaController extends Controller
                     'origen_actualizacion' => Punto::ORIGEN_RECOLECCION,
                     'ultima_actualizacion_estado' => now(),
                 ]);
+                if ($parada->punto instanceof Punto) {
+                    $vaciados[] = $parada->punto;
+                }
             }
         });
+
+        // Demo: el sensor simulado del punto reporta el contenedor vacío, como uno real.
+        foreach ($vaciados as $punto) {
+            app(SimuladorDeSensores::class)->reportarVaciado($punto);
+        }
 
         return new RutaResource($ruta->fresh()->load(self::RELACIONES));
     }
