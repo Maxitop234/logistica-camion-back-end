@@ -406,3 +406,22 @@ test('cancelar no pisa el estado de un camión en mantenimiento', function () {
 
     expect($this->camion->fresh()->estado_operativo)->toBe('mantenimiento');
 });
+
+test('una ruta cancelada aún recibe las recolecciones que el chofer hizo sin señal', function () {
+    $rutaId = generarRutaParaCancelar($this);
+    $this->actingAs($this->chofer->user, 'sanctum')->postJson("/api/v1/rutas/{$rutaId}/iniciar")->assertOk();
+    $this->actingAs($this->adminUser, 'sanctum')
+        ->postJson("/api/v1/rutas/{$rutaId}/cancelar", ['motivo' => 'Cambio de plan'])
+        ->assertOk();
+
+    $puntoId = Ruta::with('paradas')->findOrFail($rutaId)->paradas[0]->punto_id;
+    $this->actingAs($this->chofer->user, 'sanctum')
+        ->postJson("/api/v1/rutas/{$rutaId}/sincronizar-lote", ['recolecciones' => [[
+            'punto_id' => $puntoId,
+            'sync_uuid' => Str::uuid()->toString(),
+            'hora_real_recoleccion' => now()->subMinutes(5)->toIso8601String(),
+        ]]])
+        ->assertOk()
+        ->assertJsonPath('data.estado', Ruta::ESTADO_CANCELADA)
+        ->assertJsonPath('data.paradas.0.estado_parada', 'recolectado');
+});

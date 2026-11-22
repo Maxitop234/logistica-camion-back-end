@@ -307,7 +307,8 @@ class RutaController extends Controller
             return response()->json(['message' => 'No tienes permiso para registrar recolecciones en esta ruta.'], 403);
         }
 
-        if ($ruta->estado !== Ruta::ESTADO_EN_CURSO) {
+        // Una ruta cancelada sigue aceptando lo que el chofer ya había recolectado sin señal.
+        if (! in_array($ruta->estado, [Ruta::ESTADO_EN_CURSO, Ruta::ESTADO_CANCELADA], true)) {
             return response()->json(['message' => 'La ruta debe estar en curso para registrar recolecciones.'], 422);
         }
 
