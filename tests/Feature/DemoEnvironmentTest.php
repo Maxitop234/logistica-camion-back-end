@@ -3,6 +3,7 @@
 use App\Models\Administrador;
 use App\Models\Camion;
 use App\Models\Chofer;
+use App\Models\Dispositivo;
 use App\Models\LecturaPunto;
 use App\Models\ProyeccionFlota;
 use App\Models\Punto;
@@ -184,4 +185,31 @@ test('ecoruta:generar-historial ancla rutas, lecturas y heartbeats de sensores a
     } finally {
         Carbon::setTestNow();
     }
+});
+
+test('los sensores demo quedan simulados aunque ya existieran como dispositivos sin simulacion y se ponen al dia al consultar', function () {
+    configurarEntornoDemo();
+    config(['iot.simulador.espera_seg' => 0]);
+    $this->seed(DatabaseSeeder::class);
+    $this->seed(DemoSeeder::class);
+
+    // Estado que dejo la migracion de dispositivos: mismo codigo, sin token ni simulacion.
+    $total = Dispositivo::count();
+    expect($total)->toBeGreaterThan(5);
+    Dispositivo::query()->update(['es_simulado' => false, 'simulacion' => null, 'token_hash' => null]);
+
+    $this->seed(DemoSeeder::class);
+
+    expect(Dispositivo::count())->toBe($total)
+        ->and(Dispositivo::where('es_simulado', true)->count())->toBe($total);
+
+    // Pasa un dia: el simple listado debe completar las lecturas, sin botones ni comandos.
+    $this->travelTo(now()->addHours(25));
+    $admin = User::where('role', 'administrador')->firstOrFail();
+    Sanctum::actingAs($admin);
+
+    $estados = collect($this->getJson('/api/v1/dispositivos')->assertOk()->json('data'))->pluck('estado_conexion');
+
+    expect($estados->filter(fn ($e) => $e === 'sin_reportar')->count())->toBeLessThan($total)
+        ->and($estados->filter(fn ($e) => $e === 'en_linea' || $e === 'bateria_baja')->count())->toBeGreaterThan($total / 2);
 });

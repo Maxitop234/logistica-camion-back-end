@@ -6,6 +6,7 @@ use App\Console\Commands\GenerarHistorialDemoCommand;
 use App\Models\Administrador;
 use App\Models\Camion;
 use App\Models\Chofer;
+use App\Models\CodigoVinculacion;
 use App\Models\Dispositivo;
 use App\Models\Punto;
 use App\Models\Sector;
@@ -226,6 +227,13 @@ class DemoSeeder extends Seeder
             );
 
             // Los sensores de la demo se vinculan con el mismo flujo que uno físico.
+            if ($tieneSensor) {
+                // Un dispositivo con este código que no es simulado (p. ej. el que la migración de
+                // dispositivos creó desde el antiguo `sensor_codigo` del punto) no tiene token ni
+                // simulación: el simulador lo ignoraría y quedaría "sin reportar". Se vuelve a vincular.
+                Dispositivo::where('codigo_hardware', $sensorCodigo)->where('es_simulado', false)->delete();
+                CodigoVinculacion::where('codigo_hardware', $sensorCodigo)->delete();
+            }
             if ($tieneSensor && ! Dispositivo::where('codigo_hardware', $sensorCodigo)->exists()) {
                 $simulador->aprovisionar($sensorCodigo, $punto, $admin, [
                     'nivel_inicial' => $porcentaje,
