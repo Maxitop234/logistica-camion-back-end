@@ -32,7 +32,13 @@ class KpiCalculatorService
      * categorías, además de los parámetros operativos vigentes (indicando cuáles
      * siguen como valor de referencia).
      *
-     * @return array<string, mixed>
+     * @return array{
+     *     periodo: array{fecha_inicio: string, fecha_fin: string, agrupacion: string, dias: int},
+     *     parametros: list<array<string, mixed>>,
+     *     tiene_valores_referencia: bool,
+     *     categorias: list<array{id: string, titulo: string}>,
+     *     kpis: list<array<string, mixed>>
+     * }
      */
     public function calcularDashboard(CarbonInterface $inicio, CarbonInterface $fin, string $agrupacion = 'semana'): array
     {

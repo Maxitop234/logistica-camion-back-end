@@ -11,7 +11,13 @@ class KpiExportService
      * Genera un CSV con separador `;` y BOM UTF-8 (compatible con Excel en
      * español, tildes y `ñ`) con los 11 KPI de negocio y parámetros vigentes.
      *
-     * @param  array<string, mixed>  $dashboard
+     * @param  array{
+     *     periodo: array{fecha_inicio: string, fecha_fin: string, agrupacion: string, dias: int},
+     *     parametros: list<array<string, mixed>>,
+     *     tiene_valores_referencia: bool,
+     *     categorias: list<array{id: string, titulo: string}>,
+     *     kpis: list<array<string, mixed>>
+     * }  $dashboard
      */
     public function generarCsv(array $dashboard): string
     {
@@ -68,7 +74,13 @@ class KpiExportService
      * Genera un reporte PDF UTF-8 usando `barryvdh/laravel-dompdf` (con fuente
      * DejaVu Sans para tildes y `ñ`).
      *
-     * @param  array<string, mixed>  $dashboard
+     * @param  array{
+     *     periodo: array{fecha_inicio: string, fecha_fin: string, agrupacion: string, dias: int},
+     *     parametros: list<array<string, mixed>>,
+     *     tiene_valores_referencia: bool,
+     *     categorias: list<array{id: string, titulo: string}>,
+     *     kpis: list<array<string, mixed>>
+     * }  $dashboard
      */
     public function generarPdf(array $dashboard): string
     {
