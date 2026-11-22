@@ -12,6 +12,7 @@ use App\Models\Chofer;
 use App\Models\Punto;
 use App\Models\Ruta;
 use App\Models\RutaPunto;
+use App\Services\Desvios\DetectorDeDesvios;
 use App\Services\GpsTelemetryService;
 use App\Services\OsmRouteOptimizerService;
 use Illuminate\Http\JsonResponse;
@@ -19,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 class RutaController extends Controller
 {
@@ -276,7 +278,7 @@ class RutaController extends Controller
     /**
      * Finaliza una ruta en curso y devuelve el camión a estado disponible.
      */
-    public function finalizar(Request $request, Ruta $ruta, GpsTelemetryService $gpsService): RutaResource|JsonResponse
+    public function finalizar(Request $request, Ruta $ruta, GpsTelemetryService $gpsService, DetectorDeDesvios $detector): RutaResource|JsonResponse
     {
         $chofer = $request->user()?->chofer()->first();
         if (! $chofer instanceof Chofer || $ruta->chofer_id !== $chofer->id) {
@@ -304,6 +306,13 @@ class RutaController extends Controller
                 'distancia_real_km' => $distanciaRealKm,
             ]);
         });
+
+        // Guarda los tramos en que el camión se salió de lo planificado; un fallo aquí no debe impedir cerrar la ruta.
+        try {
+            $detector->detectar($ruta->fresh());
+        } catch (Throwable $e) {
+            report($e);
+        }
 
         return new RutaResource($ruta->fresh()->load(self::RELACIONES));
     }

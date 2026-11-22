@@ -156,6 +156,10 @@ Los 12 sectores reales (planilla de georreferenciación, cierre de mayo de 2026)
 `id`, `camion_id` (FK cascade), `ruta_id` (FK cascade), `chofer_id` (FK null), `dispositivo_movil_id` (FK null), `latitud`, `longitud` (decimal 10,7), `velocidad_kmh` (decimal 5,2 null), `rumbo_grados` (smallint null), `precision_m` (decimal 6,2 null), `capturado_en` (timestampTz), `recibido_en` (timestampTz).
 Índices: `(camion_id, capturado_en desc)`, `(ruta_id, capturado_en)`. Retención: `GPS_RETENCION_DIAS` (BE-18).
 
+### `desvios_ruta`
+
+Tramos en que el camión se alejó de la ruta planificada (ver `docs/API.md` §3.6). Una fila por (`ruta_id`, `inicio_en`): `chofer_id`, `camion_id`, `fin_en`, `distancia_m`, `max_separacion_m`, `geometria_real` y `geometria_planificada` (polilíneas), `clave_tramo` (celdas de inicio y fin para agrupar repeticiones), `centro_latitud/longitud`, `motivo_codigo` y `motivo_texto` (opcionales, los informa el chofer) y `revisado_en`.
+
 ### `consumo_comunicaciones` (BE-09)
 `id`, `fecha` (date), `origen_tipo` (`dispositivo_iot`, `dispositivo_movil`), `origen_id`, `peticiones` (int), `bytes_entrada` (bigint), `bytes_salida` (bigint), `errores` (int), `rssi_suma`, `rssi_muestras` (para el promedio). Único `(fecha, origen_tipo, origen_id)`; se actualiza con *upsert* incremental.
 

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CamionController;
 use App\Http\Controllers\Api\V1\ChoferController;
+use App\Http\Controllers\Api\V1\DesvioController;
 use App\Http\Controllers\Api\V1\GeocodificacionController;
 use App\Http\Controllers\Api\V1\GpsController;
 use App\Http\Controllers\Api\V1\IotLecturaController;
@@ -63,6 +64,8 @@ Route::prefix('v1')->group(function () {
             Route::get('puntos', [PuntoController::class, 'indexChofer']);
             Route::post('solicitudes-punto', [SolicitudPuntoController::class, 'store']);
             Route::get('ruta-activa', [RutaController::class, 'rutaActiva']);
+            Route::get('desvios', [DesvioController::class, 'indexChofer']);
+            Route::put('desvios/{desvio}/motivo', [DesvioController::class, 'registrarMotivo']);
         });
 
         Route::post('rutas/{ruta}/iniciar', [RutaController::class, 'iniciar']);
@@ -86,6 +89,8 @@ Route::prefix('v1')->group(function () {
         Route::post('rutas/generar', [RutaController::class, 'generar']);
         Route::get('rutas/{ruta}/traza', [GpsController::class, 'traza']);
         Route::get('gps/flota', [GpsController::class, 'flota']);
+        Route::get('rutas/{ruta}/desvios', [DesvioController::class, 'porRuta']);
+        Route::get('desvios/calles-problematicas', [DesvioController::class, 'callesProblematicas']);
 
         Route::get('kpis/dashboard', [KpiController::class, 'dashboard']);
         Route::get('kpis/alertas', [KpiController::class, 'alertas']);

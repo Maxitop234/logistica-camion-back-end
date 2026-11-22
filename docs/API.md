@@ -189,6 +189,19 @@ Errores: `401 Credenciales inválidas.` · `403 La cuenta está desactivada.` ·
 
 ---
 
+### 3.6 Desvíos de ruta y calles problemáticas
+
+La traza real ya se guarda en `telemetria_gps` (`POST /gps/ping`, `GET /rutas/{id}/traza`). Al finalizar una ruta (y al consultar los desvíos de una ruta en curso) se compara con `encoded_polyline`: un **desvío** es un tramo con lecturas a más de `DESVIO_UMBRAL_M` (40 m) de lo planificado que recorre al menos `DESVIO_LONGITUD_MINIMA_M` (100 m) fuera de ruta.
+
+| Endpoint | Rol | Descripción |
+|---|---|---|
+| `GET /rutas/{ruta}/desvios` | administrador | Desvíos de la ruta: `inicio_en`, `fin_en`, `distancia_m`, `max_separacion_m`, `geometria_real` y `geometria_planificada` (polilíneas 1e5), motivo. |
+| `GET /chofer/desvios` | chofer | Sus desvíos pendientes de revisión (`?todos=1` incluye los ya revisados). |
+| `PUT /chofer/desvios/{id}/motivo` | chofer | `{motivo_codigo?, motivo_texto?, omitir?}`; el motivo es opcional, pero se debe enviar al menos un campo (o `omitir: true`). Códigos: `calle_otro_sentido`, `calle_cerrada_obras`, `no_pasa_camion`, `atajo_mas_rapido`, `otro`. `403` si el desvío es de otro chofer. |
+| `GET /desvios/calles-problematicas?umbral=3&dias=90` | administrador | Tramos con al menos `umbral` desvíos (por defecto `DESVIO_UMBRAL_REPORTE`): cantidad, rutas y choferes distintos, motivos, comentarios y geometrías. |
+
+Un tramo se identifica por la celda (~100 m) donde empieza y termina el desvío sobre la ruta planificada; es una aproximación (un mismo desvío cerca del borde de una celda puede quedar partido en dos claves).
+
 ## 4. Endpoints pendientes (contrato propuesto)
 
 ### 4.1 Licencias de conducir (BE-12)

@@ -308,6 +308,44 @@ class OsmRouteOptimizerService
         return $resultado;
     }
 
+    /**
+     * Decodifica una polilínea estándar (precisión 1e5) a pares [lat, lng].
+     *
+     * @return array<int, array{0: float, 1: float}>
+     */
+    public static function decodificarPolilinea(string $codificada): array
+    {
+        $puntos = [];
+        $indice = 0;
+        $largo = strlen($codificada);
+        $lat = 0;
+        $lng = 0;
+
+        while ($indice < $largo) {
+            foreach ([0, 1] as $eje) {
+                $resultado = 0;
+                $desplazamiento = 0;
+                do {
+                    if ($indice >= $largo) {
+                        return $puntos;
+                    }
+                    $b = ord($codificada[$indice++]) - 63;
+                    $resultado |= ($b & 0x1F) << $desplazamiento;
+                    $desplazamiento += 5;
+                } while ($b >= 0x20);
+                $delta = ($resultado & 1) ? ~($resultado >> 1) : ($resultado >> 1);
+                if ($eje === 0) {
+                    $lat += $delta;
+                } else {
+                    $lng += $delta;
+                }
+            }
+            $puntos[] = [$lat / 1e5, $lng / 1e5];
+        }
+
+        return $puntos;
+    }
+
     private static function codificarValor(int $valor): string
     {
         $v = $valor < 0 ? ~($valor << 1) : ($valor << 1);
