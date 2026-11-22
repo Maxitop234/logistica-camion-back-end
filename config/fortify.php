@@ -161,15 +161,11 @@ return [
     */
 
     'features' => [
-        Features::registration(),
-        Features::resetPasswords(),
-        Features::emailVerification(),
+        // Solo se reutiliza el TOTP de Fortify (columnas y proveedor del usuario);
+        // sus rutas web no se registran (ver FortifyServiceProvider). Sin registro,
+        // recuperación web, verificación de correo ni passkeys.
         Features::twoFactorAuthentication([
             'confirm' => true,
-            'confirmPassword' => false,
-            // 'window' => 0
-        ]),
-        Features::passkeys([
             'confirmPassword' => false,
         ]),
     ],
