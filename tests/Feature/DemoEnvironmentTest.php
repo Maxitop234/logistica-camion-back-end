@@ -18,6 +18,10 @@ use Database\Seeders\SectorSeeder;
 use Illuminate\Support\Carbon;
 use Laravel\Sanctum\Sanctum;
 
+afterEach(function (): void {
+    Carbon::setTestNow();
+});
+
 function configurarEntornoDemo(): void
 {
     config([
@@ -83,6 +87,10 @@ test('ecoruta:generar-historial se niega cuando APP_DEMO_MODE es false', functio
 });
 
 test('ecoruta:generar-historial llena los 11 KPI sin estados vacios, genera alertas y es reproducible e idempotente', function () {
+    // El KPI-05 mide hasta "ahora" los episodios de contenedor lleno que siguen abiertos, y
+    // el historial se ancla a la hora actual: con el reloj real, los segundos entre las dos
+    // ejecuciones mueven los episodios cercanos a las 12 h. Se fija el reloj (determinista).
+    Carbon::setTestNow(Carbon::parse('2027-03-15 11:10:00'));
     configurarEntornoDemo();
     $this->seed(DemoSeeder::class);
 
@@ -125,7 +133,8 @@ test('ecoruta:generar-historial llena los 11 KPI sin estados vacios, genera aler
         ->toContain('sensor_sin_reporte')
         ->toContain('bateria_baja');
 
-    // Segunda ejecución con la misma semilla: idempotente (sin duplicar filas ni cambiar valores KPI).
+    // Segunda ejecución con la misma semilla y el mismo reloj: idempotente (sin duplicar
+    // filas ni cambiar valores KPI).
     $this->artisan('ecoruta:generar-historial', [
         '--meses' => 2,
         '--semilla' => 20261121,
