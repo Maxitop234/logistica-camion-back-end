@@ -74,7 +74,7 @@ flowchart LR
 | Licencias | Documento de licencia, vencimiento, verificación y regla clase ↔ camión | `app/Services/Licencias/` | ⏳ | BE-12 |
 | Puntos y sectores | Puntos georreferenciados, sector y día de recolección, estado de llenado | `PuntoController`, `SectorController` | ⏳ | BE-03, BE-04 |
 | Sensores IoT | Registro de kits, token por dispositivo, batería, heartbeat | `DispositivoController` | ⏳ | BE-05 |
-| Ingesta IoT | `POST /iot/telemetria`, cálculo de porcentaje y estado | `app/Services/Iot/ProcesadorDeTelemetria` | ⏳ | BE-06 |
+| Ingesta IoT | `POST /iot/lecturas`, cálculo de porcentaje y estado | `app/Services/Iot/ProcesadorDeTelemetria` | ⏳ | BE-06 |
 | GPS | Ping del teléfono, flota en vivo, traza histórica | `GpsController` | ⏳ | BE-07 |
 | Administración de GPS | Estado de cada teléfono rastreador: último ping, precisión, batería, permisos | `DispositivoMovilController` | ⏳ | BE-08 |
 | Comunicaciones | Peticiones y bytes por dispositivo y día, señal, estimación mensual | middleware `RegistrarConsumo` | ⏳ | BE-09 |
@@ -142,7 +142,7 @@ sequenceDiagram
     participant API as API Laravel
     participant DB as PostgreSQL
     N->>N: Despierta, toma 5 mediciones y usa la mediana
-    N->>API: POST /iot/telemetria (X-IoT-Token) {distancia_cm, bateria_v, rssi_dbm}
+    N->>API: POST /iot/lecturas (X-IoT-Token) {distancia_cm, bateria_v, rssi_dbm}
     API->>API: % de llenado según altura calibrada → estado
     API->>DB: INSERT lecturas_iot, UPDATE puntos y dispositivos
     API-->>N: 201 {intervalo_segundos}

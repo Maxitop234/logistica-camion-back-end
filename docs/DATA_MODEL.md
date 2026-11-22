@@ -117,29 +117,35 @@ Los 12 sectores reales (planilla de georreferenciación, cierre de mayo de 2026)
 
 ## 5. Tablas pendientes ⏳
 
-### `dispositivos` — kits de sensores (BE-05)
+### `dispositivos` — sensores IoT (BE-05)
 | Columna | Tipo | Notas |
 |---|---|---|
 | `id` | bigint PK | |
-| `punto_id` | FK → `puntos`, único, null | Un sensor por punto en el piloto |
-| `codigo_hardware` | string único | MAC del ESP32 |
-| `token_hash` | string(64) único | SHA-256 del token; el token en claro no se guarda |
-| `tipo_sensor` | string | `ultrasonico_hcsr04`, `ultrasonico_jsn_sr04t` |
+| `punto_id` | FK → `puntos`, único, null, nullOnDelete | Un sensor por punto |
+| `codigo_hardware` | string(64) único | Código de la etiqueta (p. ej. `ECO-0001`) |
+| `tipo_sensor` | string | `hc_sr04`, `jsn_sr04t` (zona ciega 2 y 20 cm; `config/iot.php`) |
 | `conectividad` | string | `wifi`, `lte_m`, `nb_iot`, `lorawan` (ADR-0007) |
-| `altura_contenedor_cm` | smallint | Distancia del sensor al fondo con el contenedor vacío |
-| `distancia_sensor_lleno_cm` | smallint | Distancia mínima útil (zona ciega del sensor, ~20–25 cm según el modelo) |
-| `intervalo_lectura_seg` | int | Se devuelve al nodo en cada respuesta |
 | `firmware_version` | string null | |
-| `bateria_voltaje` | decimal(4,2) null | Última lectura |
-| `rssi_dbm` | smallint null | Última lectura |
-| `ultimo_reporte_en` | timestampTz null | |
-| `estado` | string | `activo`, `sin_reporte`, `bateria_baja`, `falla`, `inactivo` |
-| `instalado_en` | date null | |
-| `foto_instalacion_path` | string null | Disco privado; evidencia de cómo se mide |
+| `altura_contenedor_cm`, `distancia_lleno_cm` | decimal(6,2) | Calibración: distancia con el contenedor vacío y con el contenedor lleno |
+| `intervalo_lectura_seg` | int | Se devuelve al nodo en cada respuesta |
+| `estado` | string | `pendiente`, `activo`, `desactivado` (la conexión —en línea, sin reportar, batería baja— se calcula) |
+| `token_hash` | string(64) único null | SHA-256 del token; nunca se devuelve |
+| `token_pendiente_cifrado` | text null | Token cifrado que espera ser retirado por el sensor; se borra en la primera entrega |
+| `token_entregado_en`, `anunciado_en`, `vinculado_en` | timestampTz null | |
+| `aprobado_por_user_id` | FK → `users` null | |
+| `ultima_conexion_en`, `ultima_lectura_en` | timestampTz null | |
+| `ultima_distancia_cm`, `bateria_voltaje`, `rssi_dbm` | null | Última lectura válida / último reporte |
+| `lecturas_invalidas_seguidas` | smallint | Se reinicia con una lectura válida |
+| `es_simulado`, `simulacion` | bool, text cifrado | Solo demo: la memoria (token, perfil) del sensor simulado |
 | `notas` | text null | |
 
-### `lecturas_iot` (BE-06)
-`id`, `dispositivo_id` (FK cascade), `punto_id` (FK), `distancia_cm` (decimal 6,2), `porcentaje_calculado` (smallint), `estado_resultante`, `bateria_voltaje` (decimal 4,2 null), `rssi_dbm` (smallint null), `bytes_payload` (int null), `medido_en` (timestampTz, hora del nodo), `recibido_en` (timestampTz, hora del servidor). Índice `(punto_id, medido_en)`.
+### `codigos_vinculacion` (BE-05)
+`id`, `codigo_hardware` (único), `codigo_hash` (HMAC-SHA256 del código con `APP_KEY`; el código no se guarda), `lote`, `usado_en`, timestamps. Un sensor solo puede anunciarse con un par válido.
+
+### `lecturas_puntos` (lecturas válidas) y `lecturas_invalidas`
+`lecturas_puntos` agrega `dispositivo_id` (FK null) y `rssi_dbm`; es la única fuente de los KPI. `lecturas_invalidas`: `dispositivo_id`, `punto_id`, `lectura_uuid` (único), `distancia_cm`, `motivo` (`sin_eco`, `zona_ciega`, `fuera_de_rango`, `error_sensor`), `bateria_voltaje`, `rssi_dbm`, `medido_en`. Las lecturas imposibles no cambian el estado del punto.
+
+> Los puntos conservan `sensor_codigo`, `bateria_voltaje` y `ultimo_heartbeat_iot` como reflejo del dispositivo asignado (los leen KPI y mapas); `sensor_token_hash` solo queda para tokens anteriores aún no migrados.
 
 ### `rutas` (BE-10)
 `id`, `camion_id` (FK restrict), `chofer_id` (FK restrict), `creada_por_user_id` (FK null), `fecha_programada` (date), `estado` (`planificada`, `en_curso`, `completada`, `cancelada`), `modo_calculo` (`osrm`, `proximidad`), `total_puntos_evaluados`, `puntos_incluidos_count`, `puntos_excluidos_count` (smallint), `distancia_estimada_km` (decimal 6,2), `duracion_estimada_min` (smallint), `encoded_polyline` (text), `hora_inicio_real`, `hora_termino_real` (timestampTz null), `motivo_cancelacion` (text null), timestamps.

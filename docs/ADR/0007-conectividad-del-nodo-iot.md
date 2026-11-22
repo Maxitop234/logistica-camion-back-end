@@ -16,7 +16,7 @@
 | Infraestructura | AP del recinto (decenas de metros) | Red del operador; no requiere gateway | **Gateway** propio o de una red comunitaria con conexión a internet |
 | Alcance típico | Decenas de metros | Cobertura del operador | 2–5 km en ciudad y más con línea de vista; depende de la ubicación del gateway |
 | Permisos | Acuerdo con el dueño del recinto | Ninguno adicional (módulo certificado) | Lugar para la antena del gateway: techo propio, planta o poste (poste = permiso municipal o de la distribuidora) |
-| Integración con la API | HTTPS directo (`POST /iot/telemetria`) | HTTPS directo | Paquetes pequeños (decenas a cientos de bytes, sin JSON). El servidor de red (TTN o ChirpStack) los reenvía por webhook: requiere un endpoint adicional |
+| Integración con la API | HTTPS directo (`POST /iot/lecturas`) | HTTPS directo | Paquetes pequeños (decenas a cientos de bytes, sin JSON). El servidor de red (TTN o ChirpStack) los reenvía por webhook: requiere un endpoint adicional |
 | Costo del módulo | Incluido en el ESP32 | POR CONFIRMAR (cotizar) | POR CONFIRMAR, más el gateway |
 | Costo mensual | $0 adicional (usa el internet del recinto) | Plan M2M por SIM: POR CONFIRMAR con operadores | $0 por nodo; el gateway necesita internet |
 | Consumo | Alto al asociarse; mitigado con deep sleep | Bajo con PSM/eDRX | Muy bajo |

@@ -10,9 +10,12 @@ Los nodos ESP32 envían lecturas sin intervención humana. Un nodo robado o un t
 ## Decisión
 - Cada dispositivo tiene un **token aleatorio propio** (40 caracteres o más) que se muestra **una sola vez** al registrarlo. La base de datos guarda solo `hash('sha256', token)`, y la comparación se hace con `hash_equals`.
 - El nodo lo envía en el header `X-IoT-Token` por HTTPS. Un middleware `AutenticarDispositivo` resuelve el dispositivo y lo deja en la petición.
-- El token solo da acceso a `POST /iot/telemetria`, y solo para el punto asociado a ese dispositivo.
+- El token solo da acceso a `POST /iot/lecturas`, y solo para el punto asociado a ese dispositivo.
 - El administrador puede **rotar** el token (invalida el anterior) o desactivar el dispositivo.
 - Límite de 12 peticiones por minuto por dispositivo.
+
+## Actualización (2026-11-23): entrega sin intervención humana
+El administrador ya no ve ni copia tokens. El sensor se anuncia con el código secreto de su etiqueta, el administrador lo aprueba y elige su punto, y el sensor retira su token **una sola vez** consultando su estado. Rotar o reactivar deja un token nuevo para que lo retire igual. El token pendiente de retiro se guarda cifrado solo hasta esa entrega. Detalle en `docs/API.md` §4.3 y `docs/IOT_FIRMWARE_CONTRATO.md`.
 
 ## Alternativas consideradas
 - **Tokens Sanctum ligados a un usuario técnico:** mezcla personas con máquinas y complica la revocación por nodo.

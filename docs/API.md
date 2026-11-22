@@ -34,13 +34,14 @@ Los endpoints ⏳ son contratos propuestos: el cliente Flutter ya consume alguno
 | POST | `/choferes/{chofer}/licencia/verificar` | administrador | ⏳ | BE-12 | FE-09 |
 | GET/POST/GET/PUT/DELETE | `/sectores[/{sector}]` | administrador | ✅ | BE-03 | FE-05 |
 | GET/POST/GET/PUT/DELETE | `/puntos[/{punto}]` | administrador | ✅ | BE-03 | ✅ (`sector` por nombre; FE-05 debe pasar a `sector_id`) |
-| POST | `/puntos/{punto}/reactivar`, `/sensor-token`, `/simular-lectura` | administrador | ✅ | — | ✅ |
+| POST | `/puntos/{punto}/reactivar`, `/simular-lectura` | administrador | ✅ (`simular-lectura` solo con `APP_DEMO_MODE=true`; `403` si no) | — | ✅ |
 | GET | `/chofer/puntos` | chofer | ✅ | — | ✅ |
 | POST | `/notificaciones/puntos/{solicitud}/aprobar` | administrador | ✅ (`sector_id` opcional) | — | ✅ |
-| GET/POST/GET/PUT/DELETE | `/dispositivos[/{dispositivo}]` | administrador | ⏳ | BE-05 | FE-06 |
-| POST | `/dispositivos/{dispositivo}/rotar-token` | administrador | ⏳ | BE-05 | FE-06 |
-| GET | `/dispositivos/{dispositivo}/lecturas` | administrador | ⏳ | BE-06 | FE-06 |
-| POST | `/iot/telemetria` | dispositivo (`X-IoT-Token`) | ⏳ | BE-06 | firmware IOT-01 |
+| POST | `/iot/vinculacion/anunciar`, `/iot/vinculacion/estado` | sensor (código de etiqueta) | ✅ | BE-05 | firmware IOT-01 |
+| POST | `/iot/lecturas` | dispositivo (`X-IoT-Token`) | ✅ | BE-06 | firmware IOT-01 |
+| GET/PATCH | `/dispositivos[/{dispositivo}]` | administrador | ✅ | BE-05 | FE-06 |
+| POST | `/dispositivos/aprobar`, `/{dispositivo}/desvincular\|mover\|desactivar\|reactivar\|rotar-token\|calibrar-vacio` | administrador | ✅ | BE-05 | FE-06 |
+| POST | `/dispositivos/simulador/completar` | administrador | ✅ solo con `APP_DEMO_MODE=true` | — | FE-06 |
 | POST | `/gps/ping` | chofer | ⏳ | BE-07 | FE-03 |
 | GET | `/gps/flota` | administrador | ⏳ | BE-07 | FE-02 |
 | GET | `/rutas/{ruta}/traza-gps` | administrador | ⏳ | BE-07 | FE-11 |
@@ -229,37 +230,72 @@ Un tramo se identifica por la celda (~100 m) donde empieza y termina el desvío 
 
 Implementado: ver §3.5.
 
-### 4.3 Kits de sensores (BE-05)
+### 4.3 Sensores IoT: vinculación y administración (BE-05)
 
-**`Dispositivo`:** `{id, codigo_hardware, punto: {id, nombre}|null, tipo_sensor, altura_contenedor_cm, distancia_sensor_lleno_cm, intervalo_lectura_seg, conectividad: "wifi"|"lte_m"|"nb_iot"|"lorawan", firmware_version, bateria_voltaje, bateria_porcentaje, rssi_dbm, ultimo_reporte_en, estado: "activo"|"sin_reporte"|"bateria_baja"|"falla"|"inactivo", instalado_en, foto_instalacion_url}`.
+Nadie maneja tokens: cada sensor trae una etiqueta con `codigo_hardware` y un **código de vinculación** secreto (QR). Las etiquetas se generan por lote con `php artisan iot:generar-etiquetas {cantidad} --lote= --prefijo= --salida=etiquetas.csv` (columnas `codigo_hardware,codigo,qr`; el código solo se ve en ese CSV, la base guarda su HMAC). El contrato completo para el firmware está en [IOT_FIRMWARE_CONTRATO.md](IOT_FIRMWARE_CONTRATO.md).
 
-- `POST /dispositivos` responde `201` con `{data: Dispositivo, token: "<token en claro>"}`. **El token se muestra solo esta vez**; la base de datos guarda su hash.
-- `POST /dispositivos/{id}/rotar-token` invalida el token anterior y entrega uno nuevo.
-- `GET /dispositivos/{id}/lecturas?desde&hasta` → serie de lecturas (paginada, 100 por página).
+**Endpoints públicos del sensor** (límite `throttle:iot-vinculacion`: 10/min por IP y 20/min por `codigo_hardware`; `429` al excederlo):
 
-### 4.4 Telemetría IoT (BE-06)
+- `POST /iot/vinculacion/anunciar` `{codigo_hardware, codigo_vinculacion, firmware_version?, conectividad?: wifi|lte_m|nb_iot|lorawan, tipo_sensor?: hc_sr04|jsn_sr04t}` → `201` (nuevo) o `200` (ya anunciado) `{estado: "pendiente", ...}`. `403` si el código no coincide (mismo mensaje que si el hardware no existe), o si el sensor está desactivado; `409` si ya está activo.
+- `POST /iot/vinculacion/estado` `{codigo_hardware, codigo_vinculacion}` → `{estado: "pendiente"|"activo"|"desactivado", token: string|null, intervalo_lectura_seg, endpoint_lecturas, hora_servidor}`. `token` llega **una sola vez**, en la primera consulta posterior a la aprobación (o a una rotación o reactivación); después es `null`. `404` si aún no se anunció.
 
-`POST /iot/telemetria` con `X-IoT-Token`. Límite: 12 peticiones por minuto por dispositivo.
+**`Dispositivo`** (respuesta del administrador, nunca incluye el token ni su hash):
+`{id, codigo_hardware, estado: "pendiente"|"activo"|"desactivado", estado_conexion: "en_linea"|"sin_reportar"|"bateria_baja"|"pendiente"|"desactivado", punto: {id, nombre, direccion, porcentaje_llenado, estado_llenado}|null, tipo_sensor, conectividad, firmware_version, altura_contenedor_cm, distancia_lleno_cm, zona_ciega_cm, intervalo_lectura_seg, bateria_voltaje, bateria_porcentaje, bateria_baja, rssi_dbm, ultima_conexion_en, ultima_lectura_en, ultima_distancia_cm, minutos_sin_reportar, lecturas_invalidas_seguidas, token_por_retirar, anunciado_en, vinculado_en, es_simulado, notas}`.
+
+`estado_conexion`: `sin_reportar` cuando pasan más de `IOT_INTERVALOS_SIN_REPORTE` (2) intervalos del sensor desde su última conexión; `bateria_baja` bajo `IOT_BATERIA_MINIMA_V` (3,40 V).
+
+**Administrador** (`auth:sanctum`, `active`, `role:administrador`; todas las acciones quedan en `audit_logs` sin tokens ni códigos):
+
+| Método y ruta | Cuerpo | Respuesta |
+|---|---|---|
+| `GET /dispositivos?estado=` | — | `{data: [Dispositivo]}`; con `estado=pendiente` son los "sensores nuevos por vincular" |
+| `GET /dispositivos/{id}` | — | `{data: Dispositivo + lecturas}`; `lecturas` son las últimas 15 (válidas e inválidas): `{valida, medido_en, distancia_cm, porcentaje_llenado, motivo, bateria_voltaje, rssi_dbm}`. El cliente lo consulta cada pocos segundos como "lectura en vivo" |
+| `PATCH /dispositivos/{id}` | `tipo_sensor?`, `altura_contenedor_cm?` (30–500), `distancia_lleno_cm?` (0–200), `intervalo_lectura_seg?` (60–86400), `notas?` | `{data}`; recalcula el estado del punto con la última lectura |
+| `POST /dispositivos/aprobar` | `codigo_hardware`, `codigo_vinculacion` (de la etiqueta), y `punto_id` **o** `punto: {nombre, direccion, tipo_punto, latitud, longitud, sector_id?}` para crearlo ahí mismo | `201 {data}` con `token_por_retirar: true`. `404` si el sensor no se anunció, `403` si el código no coincide, `422` si el punto ya tiene sensor |
+| `POST /dispositivos/{id}/desvincular` | — | deja el sensor sin punto (sus lecturas se rechazan con `409`) |
+| `POST /dispositivos/{id}/mover` | `punto_id` | `422` si el destino ya tiene sensor |
+| `POST /dispositivos/{id}/desactivar` | — | invalida el token; el sensor recibe `403` |
+| `POST /dispositivos/{id}/reactivar` | — | genera un token nuevo que el sensor retira solo (`409` si no estaba desactivado) |
+| `POST /dispositivos/{id}/rotar-token` | — | invalida el token vigente y deja uno nuevo para el sensor (`409` si no está activo) |
+| `POST /dispositivos/{id}/calibrar-vacio` | — | usa `ultima_distancia_cm` como altura del contenedor vacío (0 %). `422` si no hay lectura válida o cae en la zona ciega |
+
+Acciones de auditoría: `dispositivo_vinculado`, `dispositivo_desvinculado`, `dispositivo_movido`, `dispositivo_desactivado`, `dispositivo_reactivado`, `token_iot_rotado`, `dispositivo_calibrado`, `dispositivo_actualizado`.
+
+**Solo demostración** (`APP_DEMO_MODE=true`; con `false` responden `403`): `POST /dispositivos/simulador/completar` envía de inmediato las lecturas que los sensores simulados no mandaron (`{data: {sensores, lecturas}}`) y `POST /puntos/{punto}/simular-lectura`. El comando `ecoruta:simular-sensores` hace lo mismo y también está bloqueado fuera de la demo. En demo, `GET /dispositivos[/{id}]`, `/puntos`, `/chofer/puntos` y `/kpis/dashboard|alertas` completan las lecturas pendientes (como mucho una vez cada `IOT_SIMULADOR_ESPERA_SEG`).
+
+> El endpoint `POST /puntos/{punto}/sensor-token` se eliminó: el token ya no se entrega al administrador. Un token por punto anterior se migró a un dispositivo con el mismo hash y sigue funcionando.
+
+### 4.4 Lecturas IoT (BE-06)
+
+`POST /iot/lecturas` con el token propio del dispositivo en `X-IoT-Token` (también se acepta `Authorization: Bearer`). Límite: 120 peticiones por minuto por IP.
 
 ```json
 {
-  "lecturas": [
-    { "distancia_cm": 41.5, "medido_en": "2026-11-18T13:55:00Z" }
-  ],
+  "distancia_cm": 41.5,
   "bateria_voltaje": 3.87,
   "rssi_dbm": -67,
-  "firmware_version": "0.3.0"
+  "firmware_version": "0.3.0",
+  "medido_en": "2026-11-18T13:55:00Z",
+  "lectura_uuid": "0b0c5f3e-5d0e-4d62-9c0b-2f2f0d1c8a11"
 }
 ```
 
-`lecturas` admite varias mediciones acumuladas en el buffer del nodo (máximo 50). **201**:
+- `distancia_cm` es obligatoria salvo que se envíe `error` (p. ej. `"error": "sin_eco"` cuando la medición falló, con `distancia_cm: null`). `medido_en` es la hora del nodo (si falta, la del servidor). `lectura_uuid` hace idempotente el reintento desde el buffer sin conexión.
+- El porcentaje usa la calibración del dispositivo: `clamp((altura − distancia) / (altura − distancia_lleno) × 100, 0, 100)`.
+- Una lectura **imposible** no cambia el punto ni cuenta como 100 %: se guarda aparte con su `motivo` (`sin_eco`, `zona_ciega` si es menor que la zona ciega del modelo —HC-SR04 2 cm, JSN-SR04T 20 cm—, `fuera_de_rango` si supera el alcance o el fondo declarado más `IOT_TOLERANCIA_FONDO_CM`) y suma a `lecturas_invalidas_seguidas`.
+
+**201** (lectura nueva; **200** con `duplicada: true` si el `lectura_uuid` ya existía):
 
 ```json
-{ "data": { "punto_id": 12, "porcentaje_llenado": 78, "estado_llenado": "alto", "lecturas_guardadas": 1 },
-  "config": { "intervalo_lectura_seg": 300 } }
+{ "data": { "id": 12, "porcentaje_llenado": 78, "estado_llenado": "alto", "...": "(recurso Punto)" },
+  "lectura": { "id": 90, "porcentaje_llenado": 78, "distancia_cm": 41.5, "...": "..." },
+  "valida": true, "motivo_invalido": null, "duplicada": false,
+  "configuracion": { "intervalo_lectura_seg": 3600 },
+  "hora_servidor": "2026-11-18T13:55:02Z" }
 ```
 
-`401` token inválido · `403` dispositivo inactivo · `422` distancia fuera de rango (< 2 cm o > 400 cm, rango del sensor ultrasónico).
+Con una lectura inválida: `201` con `valida: false`, `motivo_invalido` y `lectura: null`.
+`401` token ausente o inválido (el sensor debe volver a `/iot/vinculacion/estado`) · `403` dispositivo desactivado o punto inactivo · `409` sensor sin punto asignado · `422` cuerpo inválido.
 
 ### 4.5 GPS (BE-07, BE-08)
 
