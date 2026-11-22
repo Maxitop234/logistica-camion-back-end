@@ -16,9 +16,8 @@ Neon (PostgreSQL + PostGIS) · Render (API en Docker) · Netlify (panel web) · 
 | `QUEUE_CONNECTION` / `SESSION_DRIVER` / `CACHE_STORE` | `sync` / `database` / `database` |
 | `CORS_ALLOWED_ORIGINS` | URL del panel en Netlify (varias, separadas por coma) |
 | `OSRM_BASE_URL` | `https://router.project-osrm.org` (servidor público, solo demo; si falla, la API usa el respaldo local) |
-| `DEMO_ADMIN_EMAIL`, `DEMO_ADMIN_PASSWORD`, `DEMO_CHOFER_PASSWORD` | credenciales de demostración (el `DemoSeeder` las lee desde el entorno) |
 
-`PORT` lo inyecta Render. El health check es `/up`. No hay cron ni worker: la API no define tareas programadas ni jobs en cola.
+`PORT` lo inyecta Render. Las `DEMO_*` van solo en `.env.neon` (siembra local), no en Render. El health check es `/up`. No hay cron ni worker: la API no define tareas programadas ni jobs en cola.
 
 ## Sembrar la base desde el equipo local
 
@@ -50,6 +49,16 @@ Las subidas manuales no ejecutan build: lo que esté en `build/web` es lo que se
 ## APK
 
 Keystore, `android/key.properties` y comando de compilación: `docs/DESPLIEGUE.md` del repositorio del frontend. Cada versión nueva sube el número tras `+` en `version:` de `pubspec.yaml` (`1.0.0+2`, `1.0.0+3`…); Android rechaza instalar un build menor o igual sobre uno ya instalado.
+
+## Actualizar la demo
+
+El auto-deploy de Render está **desactivado**: un `git push` no despliega nada. Para actualizar:
+
+1. Render → **Manual Deploy → Deploy latest commit**.
+2. Después, si el cambio trae migraciones: `vendor/bin/sail artisan migrate --force --env=neon` (y el seeder correspondiente si cambió el esquema de los datos de demo).
+3. Si cambió el frontend: recompilar `flutter build web` con los mismos `--dart-define` y volver a subir `build/web` a Netlify.
+
+Un código nuevo sobre una base sin migrar rompe los endpoints (p. ej. `GET /puntos` con 500 al faltar `sector_id`), por eso el orden es primero el deploy y enseguida las migraciones.
 
 ## Límites del plan gratis (verificados en noviembre de 2026; revisar antes de la entrega)
 
