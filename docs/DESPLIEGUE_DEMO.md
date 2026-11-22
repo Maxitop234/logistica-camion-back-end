@@ -30,6 +30,8 @@ vendor/bin/sail artisan db:seed --class=DemoSeeder --force --env=neon
 vendor/bin/sail artisan ecoruta:generar-historial --meses=3 --env=neon
 ```
 
+`DemoSeeder` también carga los 12 sectores reales (`SectorSeeder`) y asigna a ellos los puntos de prueba. Es repetible: en una base ya sembrada actualiza los datos sin duplicarlos, así que los mismos tres comandos sirven para poner al día una demo desplegada antes de BE-03.
+
 Nunca `migrate:fresh` contra la base remota. Con `APP_ENV=production` Laravel además bloquea los comandos destructivos.
 
 ## Panel web (Netlify)

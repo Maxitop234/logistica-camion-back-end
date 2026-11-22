@@ -29,7 +29,8 @@ EcoRuta reemplaza ese proceso por uno basado en datos reales:
 |---|---|
 | Autenticación con tokens (Sanctum), roles, auditoría de accesos | ✅ Implementado |
 | CRUD de camiones y choferes (datos personales cifrados) | ✅ Implementado |
-| Puntos de reciclaje, sectores, sensores IoT, telemetría | ⏳ Pendiente (BE-03 a BE-06) |
+| Sectores (los 12 reales) y puntos de reciclaje: API, zona de operación y vigencia del estado (ADR-0013) | ✅ Implementado (BE-03) |
+| Importación de los puntos reales, sensores IoT, telemetría | ⏳ Pendiente (BE-04 a BE-06) |
 | GPS en vivo, administración de GPS, consumo de comunicaciones | ⏳ Pendiente (BE-07 a BE-09) |
 | Motor de rutas y ciclo de vida de la ruta | ⏳ Pendiente (BE-10, BE-11) |
 | Validación de licencias de conducir | ⏳ Pendiente (BE-12) |
@@ -120,6 +121,13 @@ Requisitos: Docker y Docker Compose. PHP y Composer en el equipo son opcionales.
 cp .env.example .env
 ```
 
+Antes de sembrar la base, elige en `.env` el ambiente y completa sus credenciales. Si falta alguna, el seeder se detiene con un mensaje que la nombra.
+
+| Ambiente | `APP_DEMO_MODE` | Variables obligatorias | Qué crea `migrate --seed` |
+|---|---|---|---|
+| Empresa (por defecto) | `false` | `ADMIN_EMAIL`, `ADMIN_PASSWORD` (opcional `ADMIN_NOMBRE`) | La cuenta de administrador y los 12 sectores reales de recolección (`SectorSeeder`). No crea puntos, camiones ni choferes |
+| Demostración | `true` | `DEMO_ADMIN_EMAIL`, `DEMO_ADMIN_PASSWORD`, `DEMO_CHOFER_PASSWORD` | Un administrador y 2 choferes de demostración, 3 camiones, los 12 sectores reales y 16 puntos de prueba asignados a esos sectores |
+
 Si no tienes PHP local, instala las dependencias con el contenedor de Sail:
 
 ```bash
@@ -138,11 +146,35 @@ vendor/bin/sail artisan key:generate
 vendor/bin/sail artisan migrate --seed
 ```
 
-La API queda en `http://localhost` (puerto `APP_PORT`) y responde `{"status":"ok"}` en `/`.
+Solo en modo demostración, para que los KPI tengan datos, genera un historial de rutas:
+
+```bash
+vendor/bin/sail artisan ecoruta:generar-historial --meses=3
+```
+
+La API queda en `http://localhost` (puerto `APP_PORT`) y responde `{"status":"ok"}` en `/`. Las credenciales para entrar son las que definiste en `.env`. Para desplegar la demo en Neon, Render y Netlify, sigue [`docs/DESPLIEGUE_DEMO.md`](docs/DESPLIEGUE_DEMO.md).
+
+### Actualizar un entorno ya levantado
+
+Después de `git pull`, instala las dependencias nuevas (si cambió `composer.lock`), aplica las migraciones y vuelve a cargar los sectores:
+
+```bash
+vendor/bin/sail composer install
+```
+
+```bash
+vendor/bin/sail artisan migrate
+```
+
+```bash
+vendor/bin/sail artisan db:seed --class=SectorSeeder
+```
+
+`SectorSeeder` es repetible: crea o actualiza los 12 sectores por nombre y no toca los puntos. En modo demostración, `vendor/bin/sail artisan db:seed --class=DemoSeeder` también reasigna los puntos de prueba a los sectores reales. No uses `migrate:fresh` si quieres conservar los datos.
+
+> **Puntos creados antes de BE-03:** la migración reemplaza la antigua columna de texto `puntos.sector` (5 sectores inventados) por `sector_id`. Los puntos que ya existían quedan sin sector y marcados para revisión (`requiere_revision = true`) hasta que se les asigne uno.
 
 > **Si ya tenías el entorno levantado antes de PostGIS:** recrea el contenedor de la base con `vendor/bin/sail up -d --force-recreate pgsql` y ejecuta `vendor/bin/sail artisan migrate`. El volumen de datos se conserva (la imagen sigue siendo Alpine y PostgreSQL 18). La imagen `postgis/postgis` solo se publica para amd64; en equipos ARM corre emulada.
-
-**Cuentas de desarrollo** (creadas por `DatabaseSeeder`, solo para entornos locales): `admin@ecoruta.test` y `chofer1@ecoruta.test` … `chofer4@ecoruta.test`. La contraseña está en el seeder. La tarea BE-15 la mueve a `DEMO_PASSWORD`.
 
 ## 6. Comandos frecuentes
 
