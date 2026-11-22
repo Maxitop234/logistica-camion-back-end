@@ -6,7 +6,9 @@ use App\Models\Camion;
 use App\Models\Chofer;
 use App\Models\Punto;
 use App\Models\Ruta;
+use App\Models\TelemetriaGps;
 use App\Models\User;
+use App\Services\GpsTelemetryService;
 use App\Services\OsmRouteOptimizerService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -216,4 +218,83 @@ test('rechaza generar ruta si no hay puntos listos o el camion no esta disponibl
             'fecha_programada' => now()->format('Y-m-d'),
         ])
         ->assertUnprocessable();
+});
+
+test('rechaza generar ruta con un camion que tiene otro chofer asignado', function () {
+    Punto::factory()->lleno()->create();
+    $otro = Chofer::factory()->create();
+
+    $this->actingAs($this->adminUser, 'sanctum')
+        ->postJson('/api/v1/rutas/generar', [
+            'camion_id' => $this->camion->id,
+            'chofer_id' => $otro->id,
+            'fecha_programada' => now()->format('Y-m-d'),
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'El camión seleccionado ya tiene otro chofer asignado.');
+
+    expect(Ruta::count())->toBe(0);
+});
+
+test('rechaza generar ruta con un chofer que tiene otro camion asignado', function () {
+    Punto::factory()->lleno()->create();
+    $libre = Camion::factory()->create(['estado_operativo' => 'disponible', 'chofer_actual_id' => null]);
+
+    $this->actingAs($this->adminUser, 'sanctum')
+        ->postJson('/api/v1/rutas/generar', [
+            'camion_id' => $libre->id,
+            'chofer_id' => $this->chofer->id,
+            'fecha_programada' => now()->format('Y-m-d'),
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'El chofer seleccionado ya tiene otro camión asignado.');
+});
+
+test('la ruta parte de la ultima posicion GPS valida del chofer y si no hay de la planta', function () {
+    Punto::factory()->lleno()->create();
+    Http::fake(['router.project-osrm.org/*' => Http::response([], 500)]);
+    $url = '/api/v1/rutas/generar';
+    $payload = fn (string $fecha) => [
+        'camion_id' => $this->camion->id,
+        'chofer_id' => $this->chofer->id,
+        'fecha_programada' => $fecha,
+    ];
+
+    $servicio = app(GpsTelemetryService::class);
+    expect($servicio->origenParaChofer($this->chofer))->toBe([
+        OsmRouteOptimizerService::PLANTA_LAT,
+        OsmRouteOptimizerService::PLANTA_LNG,
+    ]);
+
+    $ruta = Ruta::create([
+        'chofer_id' => $this->chofer->id,
+        'camion_id' => $this->camion->id,
+        'fecha_programada' => now()->subDay()->format('Y-m-d'),
+        'estado' => Ruta::ESTADO_COMPLETADA,
+        'total_puntos_evaluados' => 0,
+        'puntos_incluidos_count' => 0,
+        'puntos_excluidos_count' => 0,
+        'distancia_estimada_km' => 0,
+        'duracion_estimada_min' => 0,
+        'encoded_polyline' => '',
+    ]);
+    $crear = fn (array $attrs) => TelemetriaGps::create($attrs + [
+        'ruta_id' => $ruta->id,
+        'camion_id' => $this->camion->id,
+        'chofer_id' => $this->chofer->id,
+        'ping_uuid' => (string) Str::uuid(),
+        'velocidad_kmh' => 0,
+        'es_simulado' => false,
+    ]);
+    $crear(['latitud' => -38.70, 'longitud' => -72.60, 'precision_m' => 10, 'capturado_en' => now()->subMinutes(20)]);
+    // Ping más reciente pero impreciso: se ignora.
+    $crear(['latitud' => -38.80, 'longitud' => -72.70, 'precision_m' => 400, 'capturado_en' => now()->subMinutes(5)]);
+    // Ping antiguo (fuera de vigencia): se ignora.
+    $crear(['latitud' => -38.90, 'longitud' => -72.90, 'precision_m' => 5, 'capturado_en' => now()->subDays(3)]);
+
+    expect($servicio->origenParaChofer($this->chofer))->toBe([-38.70, -72.60]);
+
+    $this->actingAs($this->adminUser, 'sanctum')
+        ->postJson($url, $payload(now()->format('Y-m-d')))
+        ->assertCreated();
 });

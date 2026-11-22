@@ -54,7 +54,7 @@ class RutaController extends Controller
      * Genera y persiste una ruta optimizada con OSRM (respaldo local si falla)
      * incluyendo solo puntos activos en estado `alto` o `lleno`.
      */
-    public function generar(GenerarRutaRequest $request, OsmRouteOptimizerService $optimizer): JsonResponse
+    public function generar(GenerarRutaRequest $request, OsmRouteOptimizerService $optimizer, GpsTelemetryService $gpsService): JsonResponse
     {
         $datos = $request->validated();
 
@@ -68,6 +68,19 @@ class RutaController extends Controller
         $chofer = Chofer::with('user')->findOrFail($datos['chofer_id']);
         if (! $chofer->user->is_active || ! $chofer->disponible) {
             return response()->json(['message' => 'El chofer seleccionado no está disponible.'], 422);
+        }
+
+        if ($camion->chofer_actual_id !== null && $camion->chofer_actual_id !== $chofer->id) {
+            return response()->json([
+                'message' => 'El camión seleccionado ya tiene otro chofer asignado.',
+            ], 422);
+        }
+
+        $otroCamion = Camion::where('chofer_actual_id', $chofer->id)->where('id', '!=', $camion->id)->exists();
+        if ($otroCamion) {
+            return response()->json([
+                'message' => 'El chofer seleccionado ya tiene otro camión asignado.',
+            ], 422);
         }
 
         $yaTieneRuta = Ruta::where('chofer_id', $chofer->id)
@@ -91,12 +104,12 @@ class RutaController extends Controller
             ], 422);
         }
 
-        $origenLat = isset($datos['origen']['latitud'])
-            ? (float) $datos['origen']['latitud']
-            : OsmRouteOptimizerService::PLANTA_LAT;
-        $origenLng = isset($datos['origen']['longitud'])
-            ? (float) $datos['origen']['longitud']
-            : OsmRouteOptimizerService::PLANTA_LNG;
+        if (isset($datos['origen']['latitud'], $datos['origen']['longitud'])) {
+            $origenLat = (float) $datos['origen']['latitud'];
+            $origenLng = (float) $datos['origen']['longitud'];
+        } else {
+            [$origenLat, $origenLng] = $gpsService->origenParaChofer($chofer);
+        }
 
         $optimizacion = $optimizer->optimizar($listos, $origenLat, $origenLng, now());
 

@@ -26,6 +26,8 @@ class GpsTelemetryService
 
     public const TOLERANCIA_RELOJ_SEG = 5;
 
+    public const VIGENCIA_ORIGEN_HORAS = 24;
+
     /**
      * Registra uno o varios pings GPS para el chofer autenticado, respetando
      * el orden cronológico, la idempotencia por `ping_uuid`, la restricción de
@@ -145,6 +147,31 @@ class GpsTelemetryService
             'rechazados' => $rechazados,
             'rutas' => $distancias,
         ];
+    }
+
+    /**
+     * Origen de una ruta nueva: última posición GPS válida del chofer (precisión
+     * aceptable, capturada en las últimas 24 h) o, si no existe, la Planta Terranova.
+     *
+     * @return array{0: float, 1: float} [latitud, longitud]
+     */
+    public function origenParaChofer(Chofer $chofer): array
+    {
+        $ultimo = TelemetriaGps::query()
+            ->where('chofer_id', $chofer->id)
+            ->where('capturado_en', '>=', now()->subHours(self::VIGENCIA_ORIGEN_HORAS))
+            ->where(function ($q): void {
+                $q->whereNull('precision_m')->orWhere('precision_m', '<=', self::MAX_PRECISION_M);
+            })
+            ->orderByDesc('capturado_en')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($ultimo instanceof TelemetriaGps) {
+            return [(float) $ultimo->latitud, (float) $ultimo->longitud];
+        }
+
+        return [OsmRouteOptimizerService::PLANTA_LAT, OsmRouteOptimizerService::PLANTA_LNG];
     }
 
     /**
