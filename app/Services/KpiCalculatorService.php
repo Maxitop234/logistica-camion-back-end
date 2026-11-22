@@ -35,8 +35,8 @@ class KpiCalculatorService
      */
     public function calcularDashboard(CarbonInterface $inicio, CarbonInterface $fin, string $agrupacion = 'semana'): array
     {
-        $inicioDia = $inicio->toMutable()->startOfDay();
-        $finDia = $fin->toMutable()->endOfDay();
+        $inicioDia = Carbon::instance($inicio)->startOfDay();
+        $finDia = Carbon::instance($fin)->endOfDay();
         $agrupacionValida = in_array($agrupacion, ['dia', 'semana', 'mes'], true) ? $agrupacion : 'semana';
 
         $parametros = ParametroOperativo::catalogoResuelto();
@@ -2228,7 +2228,7 @@ class KpiCalculatorService
             $porRuta[] = [
                 'id' => $ruta->id,
                 'fecha' => $ruta->fecha_programada->format('d-m-Y'),
-                'patente' => $ruta->camion?->patente ?? '—',
+                'patente' => $ruta->camion->patente,
                 'completadas' => $comp,
                 'total' => $tot,
                 'desvio_eta' => round($etaRutaProm, 1),
@@ -2326,7 +2326,7 @@ class KpiCalculatorService
             $litrosExtraTotal += $litros;
             $pesosExtraTotal += $pesos;
 
-            $choferNombre = $ruta->chofer?->nombre_cifrado ?? 'Sin chofer';
+            $choferNombre = $ruta->chofer->nombre_cifrado;
             $choferKey = $ruta->chofer_id ?? 0;
             $porChofer[$choferKey] ??= [
                 'nombre' => $choferNombre,

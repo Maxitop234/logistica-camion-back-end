@@ -58,7 +58,7 @@ class KpiAlertasService
         foreach ($rutas as $ruta) {
             $omitidas = $ruta->paradas->filter(static fn (RutaPunto $p): bool => $p->estado_parada === RutaPunto::ESTADO_OMITIDO || ($ruta->estado === Ruta::ESTADO_COMPLETADA && $p->estado_parada === RutaPunto::ESTADO_PENDIENTE));
             if ($omitidas->isNotEmpty()) {
-                $nombres = $omitidas->map(static fn (RutaPunto $p): string => $p->punto?->nombre ?? "Punto #{$p->punto_id}")->take(3)->implode(', ');
+                $nombres = $omitidas->map(static fn (RutaPunto $p): string => $p->punto->nombre ?? "Punto #{$p->punto_id}")->take(3)->implode(', ');
                 $alertas[] = [
                     'id' => "omitidas-ruta-{$ruta->id}",
                     'tipo' => 'parada_omitida',

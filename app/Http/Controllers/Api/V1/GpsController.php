@@ -83,7 +83,7 @@ class GpsController extends Controller
         $items = $camiones->map(function (Camion $camion) use ($rutasActivas, $ahora): array {
             /** @var Ruta|null $ruta */
             $ruta = $rutasActivas->get($camion->id);
-            $chofer = $ruta?->chofer ?? $camion->choferActual;
+            $chofer = $ruta instanceof Ruta ? $ruta->chofer : $camion->choferActual;
 
             $ultimaAct = $camion->ultima_actualizacion_gps;
             $antiguedad = $ultimaAct
