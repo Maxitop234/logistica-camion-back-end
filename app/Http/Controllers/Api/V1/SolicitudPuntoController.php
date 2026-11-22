@@ -11,10 +11,12 @@ use App\Models\Chofer;
 use App\Models\NotificacionChofer;
 use App\Models\Punto;
 use App\Models\SolicitudPunto;
+use App\Services\Puntos\AsignadorDeSector;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class SolicitudPuntoController extends Controller
 {
@@ -80,25 +82,42 @@ class SolicitudPuntoController extends Controller
 
     /**
      * Aprueba la propuesta, crea el punto en BD y notifica al chofer.
+     *
+     * El punto nace "sin medición" (ADR-0013). Si no se indica `sector_id`, se
+     * le asigna el sector del punto activo más cercano y queda para revisión.
      */
-    public function aprobar(Request $request, SolicitudPunto $solicitud): SolicitudPuntoResource|JsonResponse
+    public function aprobar(Request $request, SolicitudPunto $solicitud, AsignadorDeSector $asignador): SolicitudPuntoResource|JsonResponse
     {
+        $request->validate([
+            'sector_id' => ['sometimes', 'nullable', 'integer', Rule::exists('sectores', 'id')->where('activo', true)],
+        ], [
+            'sector_id.exists' => 'El sector indicado no existe o está inactivo.',
+        ]);
+
         if ($solicitud->estado !== SolicitudPunto::ESTADO_PENDIENTE) {
             return response()->json(['message' => 'Esta propuesta de punto ya fue resuelta.'], 409);
         }
 
-        DB::transaction(function () use ($solicitud, $request): void {
+        $sectorId = $request->filled('sector_id')
+            ? $request->integer('sector_id')
+            : $asignador->sectorMasCercano((float) $solicitud->latitud, (float) $solicitud->longitud)?->id;
+
+        DB::transaction(function () use ($solicitud, $request, $sectorId): void {
             $punto = Punto::create([
                 'nombre' => $solicitud->nombre,
                 'nombre_automatico' => (bool) $solicitud->nombre_automatico,
                 'direccion' => $solicitud->direccion,
                 'tipo_punto' => $solicitud->tipo_punto,
+                'sector_id' => $sectorId,
                 'latitud' => $solicitud->latitud,
                 'longitud' => $solicitud->longitud,
-                'porcentaje_llenado' => 0,
-                'estado_llenado' => Punto::ESTADO_VACIO,
+                'fuente_ubicacion' => Punto::FUENTE_MANUAL,
+                'requiere_revision' => ! $request->filled('sector_id'),
+                'nota' => $solicitud->observacion,
+                'porcentaje_llenado' => null,
+                'estado_llenado' => null,
                 'origen_actualizacion' => Punto::ORIGEN_CHOFER,
-                'ultima_actualizacion_estado' => now(),
+                'ultima_actualizacion_estado' => null,
                 'altura_contenedor_cm' => 120.0,
                 'activo' => true,
             ]);

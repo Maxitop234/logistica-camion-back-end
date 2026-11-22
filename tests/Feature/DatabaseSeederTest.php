@@ -4,6 +4,7 @@ use App\Models\Administrador;
 use App\Models\Camion;
 use App\Models\Chofer;
 use App\Models\Punto;
+use App\Models\Sector;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DemoSeeder;
@@ -19,7 +20,7 @@ test('en modo empresa DatabaseSeeder falla con mensaje claro si faltan variables
         ->toThrow(RuntimeException::class, 'ADMIN_EMAIL');
 });
 
-test('en modo empresa DatabaseSeeder crea unicamente la cuenta administradora desde env y es repetible', function () {
+test('en modo empresa DatabaseSeeder crea la cuenta administradora desde env y los 12 sectores reales, y es repetible', function () {
     config([
         'app.demo_mode' => false,
         'app.admin.email' => 'admin.empresa@terranova.test',
@@ -34,7 +35,8 @@ test('en modo empresa DatabaseSeeder crea unicamente la cuenta administradora de
         ->and(Administrador::first()?->nombre_completo)->toBe('Administración EcoRuta')
         ->and(Chofer::count())->toBe(0)
         ->and(Camion::count())->toBe(0)
-        ->and(Punto::count())->toBe(0);
+        ->and(Punto::count())->toBe(0)
+        ->and(Sector::count())->toBe(12);
 
     $this->postJson('/api/v1/auth/login', [
         'email' => 'admin.empresa@terranova.test',

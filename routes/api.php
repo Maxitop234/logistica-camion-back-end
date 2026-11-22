@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\NotificacionLicenciaController;
 use App\Http\Controllers\Api\V1\PuntoController;
 use App\Http\Controllers\Api\V1\ReactivacionChoferController;
 use App\Http\Controllers\Api\V1\RutaController;
+use App\Http\Controllers\Api\V1\SectorController;
 use App\Http\Controllers\Api\V1\SolicitudPuntoController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -75,6 +76,7 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('choferes', ChoferController::class)->parameters(['choferes' => 'chofer']);
         Route::post('choferes/{chofer}/reactivar', [ChoferController::class, 'reactivar']);
 
+        Route::apiResource('sectores', SectorController::class)->parameters(['sectores' => 'sector']);
         Route::apiResource('puntos', PuntoController::class)->parameters(['puntos' => 'punto']);
         Route::post('puntos/{punto}/reactivar', [PuntoController::class, 'reactivar']);
         Route::post('puntos/{punto}/sensor-token', [PuntoController::class, 'generarTokenSensor']);

@@ -9,8 +9,10 @@ use App\Models\ProyeccionFlota;
 use App\Models\Punto;
 use App\Models\Ruta;
 use App\Models\RutaPunto;
+use App\Models\Sector;
 use App\Models\TelemetriaGps;
 use App\Models\User;
+use Database\Seeders\SectorSeeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -25,6 +27,17 @@ beforeEach(function (): void {
 function kpiPorId(array $json, string $id): array
 {
     return collect($json['data']['kpis'])->firstWhere('id', $id);
+}
+
+/**
+ * Sector de prueba con el nombre dado (se crea una sola vez por prueba).
+ */
+function sectorKpi(string $nombre): int
+{
+    return Sector::firstOrCreate(
+        ['nombre' => $nombre],
+        ['dias_recoleccion' => [2, 4], 'periodicidad_semanal' => 2],
+    )->id;
 }
 
 it('devuelve estado sin_datos_suficientes para los 11 KPI cuando no hay historial', function (): void {
@@ -72,7 +85,7 @@ it('calcula exactamente KPI-01, KPI-02 y KPI-03 contando todos los días arrenda
             'nombre' => "Punto Costo {$i}",
             'direccion' => "Calle {$i}",
             'tipo_punto' => Punto::TIPO_CALLE,
-            'sector' => Punto::SECTOR_CENTRO,
+            'sector_id' => sectorKpi('Centro'),
             'latitud' => -38.7359,
             'longitud' => -72.5904,
             'porcentaje_llenado' => 80,
@@ -140,12 +153,12 @@ it('captura porcentaje_llenado_al_vaciar y calcula exactamente KPI-04', function
     $camion = Camion::factory()->create(['estado_operativo' => 'en_ruta']);
     $p1 = Punto::create([
         'nombre' => 'P1 Util', 'direccion' => 'Dir 1', 'tipo_punto' => Punto::TIPO_CALLE,
-        'sector' => Punto::SECTOR_CENTRO, 'latitud' => -38.735, 'longitud' => -72.59,
+        'sector_id' => sectorKpi('Centro'), 'latitud' => -38.735, 'longitud' => -72.59,
         'porcentaje_llenado' => 82, 'estado_llenado' => Punto::ESTADO_ALTO, 'activo' => true,
     ]);
     $p2 = Punto::create([
         'nombre' => 'P2 Prematuro', 'direccion' => 'Dir 2', 'tipo_punto' => Punto::TIPO_CALLE,
-        'sector' => Punto::SECTOR_PONIENTE, 'latitud' => -38.735, 'longitud' => -72.61,
+        'sector_id' => sectorKpi('Poniente'), 'latitud' => -38.735, 'longitud' => -72.61,
         'porcentaje_llenado' => 40, 'estado_llenado' => Punto::ESTADO_BAJO, 'activo' => true,
     ]);
 
@@ -202,17 +215,17 @@ it('captura porcentaje_llenado_al_vaciar y calcula exactamente KPI-04', function
 it('calcula exactamente KPI-05 (riesgo desborde + crónicos) y KPI-06 (dimensionamiento)', function (): void {
     $cronico = Punto::create([
         'nombre' => 'Feria Pinto', 'direccion' => 'Barros Arana 1150', 'tipo_punto' => Punto::TIPO_CALLE,
-        'sector' => Punto::SECTOR_CENTRO, 'latitud' => -38.74, 'longitud' => -72.585,
+        'sector_id' => sectorKpi('Centro'), 'latitud' => -38.74, 'longitud' => -72.585,
         'porcentaje_llenado' => 95, 'estado_llenado' => Punto::ESTADO_LLENO, 'activo' => true,
     ]);
     $normal = Punto::create([
         'nombre' => 'Plaza Sur', 'direccion' => 'Maquehue 1400', 'tipo_punto' => Punto::TIPO_CONDOMINIO,
-        'sector' => Punto::SECTOR_PADRE_LAS_CASAS, 'latitud' => -38.77, 'longitud' => -72.595,
+        'sector_id' => sectorKpi('Padre Las Casas'), 'latitud' => -38.77, 'longitud' => -72.595,
         'porcentaje_llenado' => 25, 'estado_llenado' => Punto::ESTADO_BAJO, 'activo' => true,
     ]);
     $adecuado = Punto::create([
         'nombre' => 'Parque Norte', 'direccion' => 'Ortega 2200', 'tipo_punto' => Punto::TIPO_CONDOMINIO,
-        'sector' => Punto::SECTOR_NORTE, 'latitud' => -38.719, 'longitud' => -72.581,
+        'sector_id' => sectorKpi('Norte'), 'latitud' => -38.719, 'longitud' => -72.581,
         'porcentaje_llenado' => 75, 'estado_llenado' => Punto::ESTADO_ALTO, 'activo' => true,
     ]);
 
@@ -287,28 +300,28 @@ it('calcula exactamente KPI-07 (planificación) y KPI-08 (confiabilidad sensores
     // 4 puntos activos: 2 IoT confiables (< 8 h y batería >= 3.40 V), 1 IoT atrasado (10 h), 1 solo manual.
     $pOk1 = Punto::create([
         'nombre' => 'IoT OK 1', 'direccion' => 'D1', 'tipo_punto' => Punto::TIPO_CALLE,
-        'sector' => Punto::SECTOR_CENTRO, 'latitud' => -38.735, 'longitud' => -72.59,
+        'sector_id' => sectorKpi('Centro'), 'latitud' => -38.735, 'longitud' => -72.59,
         'porcentaje_llenado' => 80, 'estado_llenado' => Punto::ESTADO_ALTO, 'activo' => true,
         'origen_actualizacion' => Punto::ORIGEN_SENSOR_IOT, 'sensor_codigo' => 'ESP-01',
         'bateria_voltaje' => 3.90, 'ultimo_heartbeat_iot' => now()->subHours(2),
     ]);
     Punto::create([
         'nombre' => 'IoT OK 2', 'direccion' => 'D2', 'tipo_punto' => Punto::TIPO_CALLE,
-        'sector' => Punto::SECTOR_CENTRO, 'latitud' => -38.736, 'longitud' => -72.591,
+        'sector_id' => sectorKpi('Centro'), 'latitud' => -38.736, 'longitud' => -72.591,
         'porcentaje_llenado' => 50, 'estado_llenado' => Punto::ESTADO_MEDIO, 'activo' => true,
         'origen_actualizacion' => Punto::ORIGEN_SENSOR_IOT, 'sensor_codigo' => 'ESP-02',
         'bateria_voltaje' => 3.70, 'ultimo_heartbeat_iot' => now()->subHours(5),
     ]);
     Punto::create([
         'nombre' => 'IoT Atrasado', 'direccion' => 'D3', 'tipo_punto' => Punto::TIPO_CALLE,
-        'sector' => Punto::SECTOR_PONIENTE, 'latitud' => -38.735, 'longitud' => -72.61,
+        'sector_id' => sectorKpi('Poniente'), 'latitud' => -38.735, 'longitud' => -72.61,
         'porcentaje_llenado' => 50, 'estado_llenado' => Punto::ESTADO_MEDIO, 'activo' => true,
         'origen_actualizacion' => Punto::ORIGEN_SENSOR_IOT, 'sensor_codigo' => 'ESP-03',
         'bateria_voltaje' => 3.20, 'ultimo_heartbeat_iot' => now()->subHours(10),
     ]);
     Punto::create([
         'nombre' => 'Solo Manual', 'direccion' => 'D4', 'tipo_punto' => Punto::TIPO_CALLE,
-        'sector' => Punto::SECTOR_ORIENTE, 'latitud' => -38.735, 'longitud' => -72.57,
+        'sector_id' => sectorKpi('Oriente'), 'latitud' => -38.735, 'longitud' => -72.57,
         'porcentaje_llenado' => 40, 'estado_llenado' => Punto::ESTADO_BAJO, 'activo' => true,
         'origen_actualizacion' => Punto::ORIGEN_MANUAL,
     ]);
@@ -358,12 +371,12 @@ it('calcula y autoevalúa KPI-09 bajo demanda sin cron', function (): void {
     // 2 puntos activos que ayer alcanzaron >= 70% y hoy suben +20%/día (ambos listos mañana).
     $p1 = Punto::create([
         'nombre' => 'Proy 1', 'direccion' => 'D1', 'tipo_punto' => Punto::TIPO_CALLE,
-        'sector' => Punto::SECTOR_CENTRO, 'latitud' => -38.735, 'longitud' => -72.59,
+        'sector_id' => sectorKpi('Centro'), 'latitud' => -38.735, 'longitud' => -72.59,
         'porcentaje_llenado' => 60, 'estado_llenado' => Punto::ESTADO_MEDIO, 'activo' => true,
     ]);
     $p2 = Punto::create([
         'nombre' => 'Proy 2', 'direccion' => 'D2', 'tipo_punto' => Punto::TIPO_CALLE,
-        'sector' => Punto::SECTOR_CENTRO, 'latitud' => -38.736, 'longitud' => -72.591,
+        'sector_id' => sectorKpi('Centro'), 'latitud' => -38.736, 'longitud' => -72.591,
         'porcentaje_llenado' => 75, 'estado_llenado' => Punto::ESTADO_ALTO, 'activo' => true,
     ]);
 
@@ -427,7 +440,7 @@ it('calcula exactamente KPI-10 (ranking ajustado por mediana de sector) y KPI-11
     $camion2 = Camion::factory()->create(['patente' => 'DRV-02', 'rendimiento_km_l' => 5.0]);
     $punto = Punto::create([
         'nombre' => 'Centro 1', 'direccion' => 'Prat 100', 'tipo_punto' => Punto::TIPO_CALLE,
-        'sector' => Punto::SECTOR_CENTRO, 'latitud' => -38.735, 'longitud' => -72.59,
+        'sector_id' => sectorKpi('Centro'), 'latitud' => -38.735, 'longitud' => -72.59,
         'porcentaje_llenado' => 80, 'estado_llenado' => Punto::ESTADO_ALTO, 'activo' => true,
     ]);
 
@@ -505,8 +518,10 @@ it('calcula exactamente KPI-10 (ranking ajustado por mediana de sector) y KPI-11
         ->and((float) $kpi11['valor'])->toBe(1230.0);
 });
 
-it('valida lista cerrada de sectores y exporta reportes válidos en PDF (DomPDF) y CSV', function (): void {
-    // Sector fuera de la lista cerrada debe rechazarse con 422.
+it('valida que el sector exista y exporta reportes válidos en PDF (DomPDF) y CSV', function (): void {
+    $this->seed(SectorSeeder::class);
+
+    // Un sector que no está registrado debe rechazarse con 422.
     $this->actingAs($this->admin, 'sanctum')
         ->postJson('/api/v1/puntos', [
             'nombre' => 'Punto Sector Inválido',
@@ -519,19 +534,19 @@ it('valida lista cerrada de sectores y exporta reportes válidos en PDF (DomPDF)
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['sector']);
 
-    // Sector válido se guarda correctamente.
+    // Un sector registrado (sin distinguir mayúsculas) se guarda correctamente.
     $this->actingAs($this->admin, 'sanctum')
         ->postJson('/api/v1/puntos', [
             'nombre' => 'Punto Ñielol',
             'direccion' => 'Av. Prat 123, Temuco',
             'tipo_punto' => Punto::TIPO_CALLE,
-            'sector' => 'Norte',
+            'sector' => 'poniente',
             'latitud' => -38.7200,
             'longitud' => -72.5900,
         ])
         ->assertCreated()
-        ->assertJsonPath('data.sector', 'Norte')
-        ->assertJsonPath('data.sector_resuelto', 'Norte');
+        ->assertJsonPath('data.sector', 'Poniente')
+        ->assertJsonPath('data.sector_resuelto', 'Poniente');
 
     // Exportación CSV válida UTF-8 BOM.
     $csvResp = $this->actingAs($this->admin, 'sanctum')

@@ -182,7 +182,9 @@ test('ciclo completo del chofer: iniciar, sincronizar lote idempotente y finaliz
         ->assertOk();
 
     expect($punto->fresh()->estado_llenado)->toBe(Punto::ESTADO_VACIO)
-        ->and($punto->fresh()->porcentaje_llenado)->toBe(0);
+        ->and($punto->fresh()->porcentaje_llenado)->toBe(0)
+        ->and($punto->fresh()->origen_actualizacion)->toBe(Punto::ORIGEN_RECOLECCION)
+        ->and($punto->fresh()->estado_vigente_hasta)->not->toBeNull();
 
     // Finalizar marca completada y libera el camión a disponible.
     $this->actingAs($this->chofer->user, 'sanctum')

@@ -10,8 +10,9 @@ use RuntimeException;
 class DatabaseSeeder extends Seeder
 {
     /**
-     * Seeder mínimo para el ambiente de la empresa: crea únicamente la cuenta
-     * de administrador leyendo credenciales desde `.env` (sin datos ficticios).
+     * Seeder mínimo para el ambiente de la empresa: crea la cuenta de
+     * administrador leyendo credenciales desde `.env` y los 12 sectores reales
+     * de recolección ({@see SectorSeeder}), sin datos ficticios.
      *
      * Si `APP_DEMO_MODE=true`, delega a {@see DemoSeeder} para evitar mezclar
      * la cuenta de la empresa con el ambiente de demostración.
@@ -53,5 +54,7 @@ class DatabaseSeeder extends Seeder
                 'telefono' => null,
             ],
         );
+
+        $this->call(SectorSeeder::class);
     }
 }

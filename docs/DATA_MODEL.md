@@ -71,43 +71,51 @@ erDiagram
 ### Tablas del framework
 `personal_access_tokens` (Sanctum; `name` = `device_name`), `password_reset_tokens`, `sessions`, `cache`, `jobs`, `passkeys` (Fortify, sin uso en la API; evaluar en BE-02).
 
-> ⚠️ `2026_10_28_165602_puntos.php` y `2026_10_28_165616_dispositivo.php` existen pero tienen `up()` vacío. BE-03 y BE-05 deben **eliminarlas y crear migraciones nuevas** (`create_puntos_table`, …) y luego ejecutar `migrate:fresh --seed` en los entornos locales. No hay producción todavía.
-
-## 5. Tablas pendientes ⏳
-
 ### `sectores` (BE-03)
 | Columna | Tipo | Notas |
 |---|---|---|
 | `id` | bigint PK | |
 | `nombre` | string(150), único | Nombre del sector que usa Somos Terranova |
-| `dias_recoleccion` | jsonb | Arreglo ISO 1–7 (1 = lunes). Ej. `[2, 4]` = martes y jueves |
-| `periodicidad_semanal` | smallint | Visitas por semana declaradas (1–3). Si no coincide con los días, mandan los días |
+| `dias_recoleccion` | jsonb | Arreglo ISO 1–7 (1 = lunes), normalizado (sin repetir, ordenado). Ej. `[2, 4]` = martes y jueves |
+| `periodicidad_semanal` | smallint | Visitas por semana declaradas (1–7). Si no coincide con los días, mandan los días |
 | `puntos_esperados` | smallint null | Número de puntos que debería tener el sector (sirve para conciliar la importación) |
 | `descripcion` | text null | |
-| `activo` | bool | |
+| `activo` | bool | Baja lógica; no se desactiva con puntos activos |
+| `created_at`, `updated_at` | timestampTz | |
 
-### `puntos` (BE-03, BE-04)
+Los 12 sectores reales (planilla de georreferenciación, cierre de mayo de 2026) se cargan con `SectorSeeder`.
+
+### `puntos` (BE-03; columnas de importación para BE-04)
 | Columna | Tipo | Notas |
 |---|---|---|
 | `id` | bigint PK | |
-| `sector_id` | FK → `sectores` | restrictOnDelete |
-| `nombre` | string | Ej. "Condominio Los Pablos" |
+| `sector_id` | FK null → `sectores` | restrictOnDelete; índice. `null` solo en datos antiguos o importaciones por revisar |
+| `nombre`, `nombre_automatico` | string, bool | `nombre_automatico` = el nombre viene de la geocodificación inversa |
 | `direccion` | string | |
-| `tipo_punto` | string | `condominio`, `punto_calle`, `empresa`, `municipio` |
-| `tipo_material` | string null | `plastico`, `vidrio`, `carton`, `mixto` (confirmar con la empresa) |
-| `latitud`, `longitud` | decimal(10,7) | Validar dentro de la caja de Temuco–Padre Las Casas |
-| `ubicacion` | geography(Point,4326) | Con PostGIS; índice GiST |
-| `estado_llenado` | string null | `vacio`, `bajo`, `medio`, `alto`, `lleno`; `null` = nunca medido |
-| `porcentaje_llenado` | smallint 0–100 null | |
-| `origen_estado` | string null | `sensor`, `manual`, `observacion`, `recoleccion` |
-| `ultima_actualizacion_estado` | timestampTz null | |
-| `estado_vigente_hasta` | timestampTz null | Después de esta fecha el estado se trata como desconocido y el punto entra por calendario ([ADR-0013](ADR/0013-estado-de-puntos-sin-sensor.md)) |
-| `fuente_ubicacion` | string | `coordenadas`, `geocodificada`, `manual` (cómo se obtuvo la coordenada al importar) |
-| `requiere_revision` | bool | Coordenada dudosa, punto dado de baja en terreno o fuera de la zona |
-| `nota` | text null | Nota libre del archivo de importación |
-| `codigo_externo` | string null, único | Identificador estable de la fila en el archivo de importación (importación idempotente, BE-04) |
-| `activo` | bool | |
-Índices: `(activo, estado_llenado)`, `sector_id`.
+| `tipo_punto` | string | `condominio`, `calle` (enum `TipoPunto`) |
+| `tipo_material` | string(16) null | `plastico`, `vidrio`, `carton`, `mixto` (confirmar con la empresa) |
+| `latitud`, `longitud` | decimal(10,7) | Dentro de la caja de la zona de operación (`config/ecoruta.php`, `ZONA_*`) |
+| `ubicacion` | geography(Point,4326) | **Columna generada** por PostgreSQL desde `latitud`/`longitud` (siempre sincronizada); índice GiST |
+| `fuente_ubicacion` | string(16) | `coordenadas`, `geocodificada`, `manual` (por defecto `manual`) |
+| `requiere_revision` | bool | Coordenada dudosa, sector sugerido automáticamente, punto dado de baja en terreno o fuera de la zona |
+| `nota` | text null | Nota libre (importación o propuesta del chofer) |
+| `codigo_externo` | string(64) null, único | Identificador estable de la fila en el archivo de importación (BE-04) |
+| `estado_llenado` | string null | `vacio`, `bajo`, `medio`, `alto`, `lleno` (enum `EstadoLlenado`); `null` = nunca medido |
+| `porcentaje_llenado` | smallint 0–100 null | `null` = nunca medido o estado ajustado sin porcentaje |
+| `peso_actual_kg` | decimal(6,2) null | |
+| `origen_actualizacion` | string(24) | `manual`, `chofer` (observación en terreno), `sensor_iot`, `recoleccion` (enum `OrigenEstado`) |
+| `ultima_actualizacion_estado` | timestamp null | |
+| `estado_vigente_hasta` | timestampTz null | La calcula `VigenciaDeEstado` al guardar; después de esa hora el estado cuenta como desconocido y el punto entra por calendario ([ADR-0013](ADR/0013-estado-de-puntos-sin-sensor.md)) |
+| `altura_contenedor_cm` | decimal(6,2) | Calibración del sensor ultrasónico (por defecto 120) |
+| `sensor_codigo`, `sensor_token_hash` | string null | Código del ESP32 (único) y SHA-256 de su token |
+| `bateria_voltaje`, `ultimo_heartbeat_iot` | decimal(4,2) null, timestamp null | |
+| `activo` | bool | Baja lógica; no se desactiva si está en una ruta `en_curso` |
+
+Índices: `(activo, estado_llenado)`, `sector_id`, GiST sobre `ubicacion`.
+
+> Las migraciones vacías `2026_10_28_165602_puntos.php` y `2026_10_28_165616_dispositivo.php` se eliminaron en BE-03.
+
+## 5. Tablas pendientes ⏳
 
 ### `dispositivos` — kits de sensores (BE-05)
 | Columna | Tipo | Notas |
@@ -162,7 +170,7 @@ erDiagram
 
 | Entidad | Estados | Transiciones |
 |---|---|---|
-| Punto (`estado_llenado`) | desconocido · vacio → bajo → medio → alto → lleno | Por porcentaje (umbrales 10/40/70/89); la recolección lo devuelve a `vacio` con 0 %; al pasar `estado_vigente_hasta` vuelve a contar como desconocido (ADR-0013) |
+| Punto (`estado_llenado`) | sin medición (`null`) · vacio → bajo → medio → alto → lleno | Por porcentaje (umbrales 10/40/70/89, `EstadoLlenado::desdePorcentaje`); la recolección lo devuelve a `vacio` con 0 % y origen `recoleccion`; al pasar `estado_vigente_hasta` vuelve a contar como desconocido (ADR-0013) |
 | Camión | disponible ⇄ en_ruta; disponible ⇄ mantenimiento; * → inactivo | `en_ruta` solo por iniciar/finalizar ruta |
 | Ruta | planificada → en_curso → completada; planificada → cancelada | Iniciar y finalizar las hace el chofer; cancelar, el administrador |
 | Parada | pendiente → recolectado; pendiente → omitido (al finalizar) | Idempotente por `sync_uuid` |

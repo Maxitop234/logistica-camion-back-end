@@ -2,12 +2,15 @@
 
 namespace App\Http\Requests\Punto;
 
+use App\Concerns\ZonaDeOperacionValidationRules;
 use App\Models\Punto;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreSolicitudPuntoRequest extends FormRequest
 {
+    use ZonaDeOperacionValidationRules;
+
     public function authorize(): bool
     {
         return true;
@@ -23,10 +26,18 @@ class StoreSolicitudPuntoRequest extends FormRequest
             'nombre_automatico' => ['sometimes', 'boolean'],
             'direccion' => ['required', 'string', 'min:3', 'max:255'],
             'tipo_punto' => ['required', 'string', Rule::in(Punto::TIPOS_VALIDOS)],
-            'latitud' => ['required', 'numeric', 'between:-90,90'],
-            'longitud' => ['required', 'numeric', 'between:-180,180'],
+            'latitud' => $this->latitudEnZonaRules(),
+            'longitud' => $this->longitudEnZonaRules(),
             'observacion' => ['nullable', 'string', 'max:500'],
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return $this->zonaDeOperacionMessages();
     }
 
     protected function prepareForValidation(): void

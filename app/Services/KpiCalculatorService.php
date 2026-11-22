@@ -1855,7 +1855,7 @@ class KpiCalculatorService
                 $puntosCamion += $vaciadosRuta->count();
 
                 foreach ($vaciadosRuta as $parada) {
-                    $sector = $parada->punto instanceof Punto ? $parada->punto->sectorResuelto() : Punto::SECTOR_CENTRO;
+                    $sector = $parada->punto instanceof Punto ? $parada->punto->sectorResuelto() : Punto::SIN_SECTOR;
                     $porSector[$sector] = ($porSector[$sector] ?? 0) + 1;
                 }
             }
@@ -2028,7 +2028,7 @@ class KpiCalculatorService
                 $pct = (int) $p->porcentaje_llenado_al_vaciar;
                 $sumaLlenado += $pct;
                 $esUtil = $pct >= $umbral;
-                $sector = $p->punto instanceof Punto ? $p->punto->sectorResuelto() : Punto::SECTOR_CENTRO;
+                $sector = $p->punto instanceof Punto ? $p->punto->sectorResuelto() : Punto::SIN_SECTOR;
                 $porSector[$sector] ??= ['total' => 0, 'utiles' => 0, 'km_prematuras' => 0.0];
                 $porSector[$sector]['total']++;
 
@@ -2466,7 +2466,7 @@ class KpiCalculatorService
             }
         }
         if ($sectores === []) {
-            return Punto::SECTOR_CENTRO;
+            return Punto::SIN_SECTOR;
         }
         $conteos = array_count_values($sectores);
         arsort($conteos);

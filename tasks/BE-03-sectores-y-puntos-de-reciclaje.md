@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Pendiente |
+| Estado | Hecha |
 | Prioridad | P0 |
 | Responsable sugerido | Nelson |
 | Depende de | BE-01 |
@@ -32,16 +32,35 @@ Administrar los puntos de reciclaje reales con sector, día de recolección, ubi
 7. Actualizar `docs/API.md` §4.2 y `docs/DATA_MODEL.md`.
 
 ## Criterios de aceptación
-- [ ] `GET /api/v1/puntos?estado_llenado=alto,lleno` devuelve solo puntos listos y activos.
-- [ ] Un chofer recibe 403 en todos los endpoints de puntos y sectores.
-- [ ] Coordenadas fuera de la zona → 422 con un mensaje claro.
-- [ ] `EstadoLlenado::desdePorcentaje` cubre los bordes 0, 10, 11, 40, 41, 70, 71, 89, 90 y 100.
-- [ ] Un punto recolectado el martes en un sector de martes y jueves queda con estado vigente hasta el miércoles; el jueves cuenta como desconocido.
-- [ ] Un punto nunca medido tiene `estado_llenado = null` y `estado_vigente = false` (no `vacio`).
-- [ ] Las migraciones vacías ya no existen y `migrate:fresh --seed` funciona.
+- [x] `GET /api/v1/puntos?estado_llenado=alto,lleno` devuelve solo puntos listos y activos.
+- [x] Un chofer recibe 403 en todos los endpoints de puntos y sectores.
+- [x] Coordenadas fuera de la zona → 422 con un mensaje claro.
+- [x] `EstadoLlenado::desdePorcentaje` cubre los bordes 0, 10, 11, 40, 41, 70, 71, 89, 90 y 100.
+- [x] Un punto recolectado el martes en un sector de martes y jueves queda con estado vigente hasta el miércoles; el jueves cuenta como desconocido.
+- [x] Un punto nunca medido tiene `estado_llenado = null` y `estado_vigente = false` (no `vacio`).
+- [x] Las migraciones vacías ya no existen y `migrate:fresh --seed` funciona.
 
 ## Pruebas
 `SectorApiTest`, `PuntoApiTest` (CRUD, filtros, roles, validación) y `EstadoLlenadoTest` (unitaria).
 
 ## Archivos probables
 `database/migrations/*_create_{sectores,puntos}_table.php`, `app/Enums/*`, `app/Models/{Sector,Punto}.php`, `app/Http/Controllers/Api/V1/{Sector,Punto}Controller.php`, `app/Http/Requests/{Sector,Punto}/*`, `app/Http/Resources/{Sector,Punto}Resource.php`, `database/factories/*`, `config/ecoruta.php`, `routes/api.php`.
+
+## Resultado (2026-11-21)
+
+**Pruebas:** `SectorApiTest`, `PuntoApiTest`, `VigenciaDeEstadoTest` y `tests/Unit/EstadoLlenadoTest`, además de ajustes en `KpiBusinessApiTest`, `DemoEnvironmentTest`, `DatabaseSeederTest` y `RutaApiTest`. `migrate:fresh --seed` se verificó a mano en modo empresa (12 sectores) y en modo demo (12 sectores y 16 puntos, todos con sector).
+
+**Decisiones y diferencias con los pasos sugeridos:**
+- **Sectores reales.** `SectorSeeder` carga los 12 sectores de la planilla de georreferenciación (días marcados y puntos de mayo); lo llaman `DatabaseSeeder` y `DemoSeeder`. En S.Martin y Amanecer la frecuencia declarada no coincide con los días marcados: se dejaron tal cual, mandan los días. **Confirmar con la empresa.**
+- **Se reemplazó la columna de texto `puntos.sector`** (lista cerrada de 5 sectores inventados con clasificación por cuadrante) por `sector_id`. `sectorResuelto()` devuelve ahora el nombre del sector real o `"Sin sector"`; KPI, demo e historial de demo agrupan por los sectores reales.
+- **El código manda sobre la documentación:** se mantiene `origen_actualizacion` (`manual`, `chofer` = observación, `sensor_iot`, más el nuevo `recoleccion`) en lugar de `origen_estado`, y `tipo_punto` sigue siendo `condominio`/`calle`.
+- **`ubicacion` es una columna generada** de PostgreSQL (siempre sincronizada, también con importaciones masivas) en vez de un evento `saving`.
+- **"Siguiente día de recolección"** es el primero estrictamente posterior a la fecha local del evento. Sin sector o sin días, un estado manual, observado o de recolección vale hasta el fin del día local.
+- **Punto sin sector:** al crearlo o al aprobar la propuesta de un chofer sin `sector_id`, se asigna el sector del punto activo más cercano y queda con `requiere_revision = true` (bandeja "Por revisar" de FE-05).
+- **Fuera del alcance pero necesario por los nulos:** al sincronizar recolecciones (`RutaController::sincronizarLote`) el punto se actualiza vía el modelo con origen `recoleccion` (recalcula la vigencia), y `porcentaje_llenado_al_vaciar` queda `null` si el punto nunca fue medido.
+
+**Avisos para otras tareas:**
+- **FE-05:** el formulario de puntos del front envía `sector` con los 5 nombres inventados; hoy solo `Poniente` coincide con un sector real y los demás responden 422. Debe usar `GET /sectores` y `sector_id`, y mostrar "sin medición" cuando `estado_llenado` sea `null` (hoy el front lo trata como 0 %/vacío).
+- **BE-10:** `RutaController::generar` todavía filtra por el estado guardado (`alto`/`lleno`) sin considerar `estado_vigente` ni el calendario del sector; debe aplicar ADR-0013 con `Punto::estadoVigente()` y `Sector::esDiaDeRecoleccion()`.
+- **Ambientes ya desplegados:** después de `migrate`, ejecutar `db:seed --class=SectorSeeder` (y `DemoSeeder` en demo) para cargar los sectores y reasignar los puntos de demostración.
+- `composer types:check` mantiene 14 errores previos en `GpsController`, `KpiAlertasService`, `KpiCalculatorService` y `KpiExportService` (no son de esta tarea).

@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\Punto;
+use App\Models\Sector;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -18,7 +19,8 @@ class PuntoFactory extends Factory
         return [
             'nombre' => 'Punto '.fake()->streetName(),
             'direccion' => fake()->streetAddress(),
-            'tipo_punto' => fake()->randomElement(['condominio', 'punto_calle', 'empresa', 'municipio']),
+            'tipo_punto' => fake()->randomElement(Punto::TIPOS_VALIDOS),
+            'sector_id' => Sector::factory(),
             'latitud' => fake()->randomFloat(6, -38.775, -38.710),
             'longitud' => fake()->randomFloat(6, -72.640, -72.560),
             'estado_llenado' => Punto::ESTADO_ALTO,
@@ -49,6 +51,25 @@ class PuntoFactory extends Factory
         return $this->state(fn () => [
             'estado_llenado' => Punto::ESTADO_BAJO,
             'porcentaje_llenado' => 25,
+        ]);
+    }
+
+    /**
+     * Punto nunca medido: sin estado ni porcentaje (ADR-0013).
+     */
+    public function sinMedicion(): static
+    {
+        return $this->state(fn () => [
+            'estado_llenado' => null,
+            'porcentaje_llenado' => null,
+            'ultima_actualizacion_estado' => null,
+        ]);
+    }
+
+    public function sinSector(): static
+    {
+        return $this->state(fn () => [
+            'sector_id' => null,
         ]);
     }
 }

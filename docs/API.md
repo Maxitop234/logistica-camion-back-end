@@ -32,8 +32,11 @@ Los endpoints ⏳ son contratos propuestos: el cliente Flutter ya consume alguno
 | GET/POST/GET/PUT/DELETE | `/choferes[/{chofer}]` | administrador | ✅ (el `motivo` del DELETE se ignora) | BE-02 | ✅ |
 | GET/POST/PUT | `/choferes/{chofer}/licencia` | administrador | ⏳ | BE-12 | FE-09 |
 | POST | `/choferes/{chofer}/licencia/verificar` | administrador | ⏳ | BE-12 | FE-09 |
-| GET/POST/GET/PUT/DELETE | `/sectores[/{sector}]` | administrador | ⏳ | BE-03 | FE-05 |
-| GET/POST/GET/PUT/DELETE | `/puntos[/{punto}]` | administrador | ⏳ | BE-03 | FE-05, FE-02 |
+| GET/POST/GET/PUT/DELETE | `/sectores[/{sector}]` | administrador | ✅ | BE-03 | FE-05 |
+| GET/POST/GET/PUT/DELETE | `/puntos[/{punto}]` | administrador | ✅ | BE-03 | ✅ (`sector` por nombre; FE-05 debe pasar a `sector_id`) |
+| POST | `/puntos/{punto}/reactivar`, `/sensor-token`, `/simular-lectura` | administrador | ✅ | — | ✅ |
+| GET | `/chofer/puntos` | chofer | ✅ | — | ✅ |
+| POST | `/notificaciones/puntos/{solicitud}/aprobar` | administrador | ✅ (`sector_id` opcional) | — | ✅ |
 | GET/POST/GET/PUT/DELETE | `/dispositivos[/{dispositivo}]` | administrador | ⏳ | BE-05 | FE-06 |
 | POST | `/dispositivos/{dispositivo}/rotar-token` | administrador | ⏳ | BE-05 | FE-06 |
 | GET | `/dispositivos/{dispositivo}/lecturas` | administrador | ⏳ | BE-06 | FE-06 |
@@ -129,6 +132,61 @@ Errores: `401 Credenciales inválidas.` · `403 La cuenta está desactivada.` ·
 | `PUT /choferes/{id}` | `nombre`, `telefono`, `licencia_clase`, `disponible` | `200` |
 | `DELETE /choferes/{id}` | Cuerpo opcional `{motivo}` (hoy se ignora, BE-02) | `204`; desactiva la cuenta, revoca sus tokens y libera el camión |
 
+### 3.5 Sectores y puntos de reciclaje — `role:administrador` (BE-03)
+
+**Recurso `Sector`**
+
+```json
+{
+  "id": 9, "nombre": "Las Quilas, centro",
+  "dias_recoleccion": [2, 5], "dias_recoleccion_nombres": ["martes", "viernes"],
+  "periodicidad_semanal": 2, "dias_coinciden_con_periodicidad": true,
+  "puntos_esperados": 31, "puntos_count": 40, "puntos_activos_count": 40,
+  "descripcion": null, "activo": true
+}
+```
+
+`dias_recoleccion` usa días ISO (1 = lunes … 7 = domingo). Si la frecuencia declarada no coincide con los días, **mandan los días** (`dias_coinciden_con_periodicidad = false` lo señala). Los 12 sectores reales de Somos Terranova se cargan con `SectorSeeder` (lo llaman `DatabaseSeeder` y `DemoSeeder`).
+
+| Acción | Cuerpo / reglas | Respuesta |
+|---|---|---|
+| `GET /sectores` | Filtro opcional `?activo=1` | `200 {data: Sector[]}` ordenados por nombre |
+| `POST /sectores` | `nombre` (único), `dias_recoleccion` (arreglo 1–7 sin repetir, al menos uno), `periodicidad_semanal` (1–7), `puntos_esperados`, `descripcion` | `201` |
+| `GET /sectores/{id}` | — | `200` |
+| `PUT /sectores/{id}` | Los mismos campos, opcionales, y `activo`. Si cambian los días se recalcula la vigencia del estado de sus puntos | `200` |
+| `DELETE /sectores/{id}` | Baja lógica (`activo = false`) | `200`; `409` si tiene puntos activos |
+
+**Recurso `Punto`**
+
+```json
+{
+  "id": 12, "nombre": "Condominio Los Avellanos", "nombre_automatico": false,
+  "direccion": "Los Avellanos 1554, Temuco", "tipo_punto": "condominio", "tipo_material": null,
+  "sector_id": 9, "sector": "Las Quilas, centro", "sector_resuelto": "Las Quilas, centro",
+  "latitud": -38.749784, "longitud": -72.609664,
+  "fuente_ubicacion": "manual", "requiere_revision": false, "nota": null, "codigo_externo": null,
+  "porcentaje_llenado": 78, "estado_llenado": "alto", "origen_actualizacion": "manual",
+  "ultima_actualizacion_estado": "2026-11-23T12:00:00+00:00",
+  "estado_vigente": true, "estado_vigente_hasta": "2026-11-25T02:59:59+00:00",
+  "altura_contenedor_cm": 120.0, "tiene_sensor": false, "sensor_codigo": null,
+  "bateria_voltaje": null, "ultimo_heartbeat_iot": null, "activo": true
+}
+```
+
+- `estado_llenado` y `porcentaje_llenado` son `null` en un punto **nunca medido** ("sin medición"); nunca se informa como `vacio`.
+- `estado_vigente` indica si el estado aún vale (ADR-0013). Si es `false`, el punto cuenta como **desconocido** y entra a la ruta por el calendario de su sector. La vigencia depende de `origen_actualizacion`: `sensor_iot` → `ESTADO_SENSOR_VIGENCIA_HORAS`; `manual` y `chofer` → hasta el fin del siguiente día de recolección del sector; `recoleccion` → hasta el fin de la víspera del siguiente día de recolección. Los días se interpretan en `ZONA_HORARIA_OPERACION` (America/Santiago).
+- `sector` es el nombre del sector (o `null`); `sector_resuelto` es el nombre o `"Sin sector"`.
+
+| Acción | Cuerpo / reglas | Respuesta |
+|---|---|---|
+| `GET /puntos` | Filtros (listas separadas por coma): `estado_llenado=alto,lleno` (también `sin_medicion`; con este filtro solo se devuelven activos salvo que se indique `activo`), `sector_id=2,5`, `activo`, `con_dispositivo`, `requiere_revision`, `estado_vigente` (`0` = desconocidos), `solo_activos` | `200`; `422` con un valor de filtro no válido |
+| `POST /puntos` | `nombre`, `direccion`, `tipo_punto` (`condominio`, `calle`), `latitud` y `longitud` **dentro de la zona de operación** (`ZONA_*`, Temuco con Labranza y Padre Las Casas), sector por `sector_id` o por nombre en `sector` (sin distinguir mayúsculas). Opcionales: `tipo_material` (`plastico`, `vidrio`, `carton`, `mixto`), `nota`, `porcentaje_llenado` o `estado_llenado`, `altura_contenedor_cm`, `sensor_codigo` | `201`. Sin nivel, el punto queda sin medición. Sin sector, se asigna el del punto activo más cercano y queda con `requiere_revision = true`. `422` si las coordenadas están fuera de la zona o el sector no existe |
+| `GET /puntos/{id}` | — | `200` con sus últimas 15 `lecturas` |
+| `PUT /puntos/{id}` | Datos del punto, `sector_id`/`sector`, `requiere_revision`, o ajuste manual del nivel: `porcentaje_llenado` (el estado se deriva) o solo `estado_llenado`. Queda con `origen_actualizacion = manual` y la hora actual. Mover el punto deja `fuente_ubicacion = manual` | `200` |
+| `DELETE /puntos/{id}` | Baja lógica (`activo = false`) | `200`; `409` si está en una ruta `en_curso` |
+
+`ubicacion` (PostGIS `geography(Point, 4326)`) se calcula en la base de datos a partir de `latitud` y `longitud`; no se expone.
+
 ---
 
 ## 4. Endpoints pendientes (contrato propuesto)
@@ -156,28 +214,7 @@ Errores: `401 Credenciales inválidas.` · `403 La cuenta está desactivada.` ·
 
 ### 4.2 Sectores y puntos de reciclaje (BE-03)
 
-**`Sector`:** `{id, nombre, dias_recoleccion: [1..7] (ISO, 1 = lunes), periodicidad_semanal, puntos_esperados, puntos_count, descripcion, activo}`.
-
-**`Punto`:**
-
-```json
-{
-  "id": 12, "nombre": "Condominio Los Pablos", "direccion": "Av. Pablo Neruda 01234, Temuco",
-  "tipo_punto": "condominio", "sector": { "id": 2, "nombre": "Sector A" },
-  "latitud": -38.7301234, "longitud": -72.6203456,
-  "estado_llenado": "alto", "porcentaje_llenado": 78, "origen_estado": "sensor",
-  "ultima_actualizacion_estado": "2026-11-18T13:58:00Z", "estado_vigente_hasta": "2026-11-19T13:58:00Z",
-  "estado_vigente": true, "fuente_ubicacion": "pin", "requiere_revision": false, "activo": true,
-  "dispositivo": { "id": 4, "codigo_hardware": "ESP32-A1B2C3", "estado": "activo" }
-}
-```
-
-| Acción | Notas |
-|---|---|
-| `GET /puntos` | Filtros: `?estado_llenado=alto,lleno`, `?sector_id=2`, `?activo=1`, `?con_dispositivo=1`, `?requiere_revision=1`, `?estado_vigente=0` (desconocidos) |
-| `POST /puntos` | `nombre`, `direccion`, `tipo_punto` (`condominio`, `punto_calle`, `empresa`, `municipio`), `sector_id`, `latitud`, `longitud` (dentro de la caja de Temuco–Padre Las Casas) |
-| `PUT /puntos/{id}` | Datos del punto o ajuste manual de `estado_llenado` / `porcentaje_llenado` (`origen_estado = "manual"`) |
-| `DELETE /puntos/{id}` | Baja lógica (`activo = false`); `409` si está en una ruta `en_curso` |
+Implementado: ver §3.5.
 
 ### 4.3 Kits de sensores (BE-05)
 

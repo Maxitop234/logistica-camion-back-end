@@ -31,7 +31,7 @@ El plan de tareas anterior quedó archivado en [`_archivo/plan-original-tareas.m
 | [BE-01](BE-01-postgis-y-ci.md) | PostgreSQL + PostGIS en Sail y en CI | P0 | — | Maximiliano | A | Hecha |
 | [BE-02](BE-02-endurecimiento-de-seguridad.md) | Endurecimiento: registro público, tokens, auditoría de bajas | P0 | — | Nelson | A | Pendiente |
 | [BE-16](BE-16-staging-https.md) | Servidor de staging accesible por HTTPS | P0 | BE-01 | Maximiliano | A | Pendiente |
-| [BE-03](BE-03-sectores-y-puntos-de-reciclaje.md) | Sectores y puntos de reciclaje (modelo + API) | P0 | BE-01 | Nelson | A | Pendiente |
+| [BE-03](BE-03-sectores-y-puntos-de-reciclaje.md) | Sectores y puntos de reciclaje (modelo + API) | P0 | BE-01 | Nelson | A | Hecha |
 | [BE-04](BE-04-importacion-de-puntos-reales.md) | Importar los sectores y puntos reales desde CSV | P0 | BE-03, CSV con los datos reales | Nelson | A | Pendiente |
 | [BE-12](BE-12-licencias-de-conducir.md) | Licencias de conducir: documentos, verificación y reglas | P0 | BE-02 | Nelson | A | Pendiente |
 | [BE-10](BE-10-motor-de-rutas-osrm.md) | Esquema de rutas y motor OSRM con modo degradado | P0 | BE-03 | Maximiliano | A | Pendiente |

@@ -120,14 +120,17 @@ class GenerarHistorialDemoCommand extends Command
             );
 
             // Grupos de sectores para variar recorridos y tiempos por sector.
+            // Cada turno recorre dos sectores reales consecutivos (por nombre), en ciclo.
             $puntosPorSector = $puntos->groupBy(static fn (Punto $p): string => $p->sectorResuelto());
-            $sectoresCiclo = [
-                [Punto::SECTOR_CENTRO, Punto::SECTOR_ORIENTE],
-                [Punto::SECTOR_PONIENTE, Punto::SECTOR_NORTE],
-                [Punto::SECTOR_PADRE_LAS_CASAS, Punto::SECTOR_CENTRO],
-                [Punto::SECTOR_ORIENTE, Punto::SECTOR_PONIENTE],
-                [Punto::SECTOR_NORTE, Punto::SECTOR_PADRE_LAS_CASAS],
-            ];
+            $nombresSector = $puntosPorSector->keys()->sort()->values()->all();
+            $sectoresCiclo = [];
+            foreach ($nombresSector as $indice => $nombreSector) {
+                $siguienteSector = $nombresSector[($indice + 1) % count($nombresSector)];
+                $sectoresCiclo[] = array_values(array_unique([$nombreSector, $siguienteSector]));
+            }
+            if ($sectoresCiclo === []) {
+                $sectoresCiclo = [[Punto::SIN_SECTOR]];
+            }
 
             $totalDias = (int) $fechaInicio->diffInDays($fechaFin);
             $secuencia = 0;
@@ -217,9 +220,9 @@ class GenerarHistorialDemoCommand extends Command
                     }
                     $distReal = round($distEstimada * $factorDesvio, 2);
 
-                    // Duración ajustada por sector (Centro y Padre Las Casas son más lentos por congestión).
-                    $esSectorLento = in_array(Punto::SECTOR_CENTRO, $sectoresTurno, true)
-                        || in_array(Punto::SECTOR_PADRE_LAS_CASAS, $sectoresTurno, true);
+                    // Duración ajustada por sector (los del centro son más lentos por congestión).
+                    $esSectorLento = collect($sectoresTurno)
+                        ->contains(static fn (string $sector): bool => str_contains(mb_strtolower($sector), 'centro'));
                     $minPorParada = $esSectorLento ? $rng->getInt(28, 36) : $rng->getInt(20, 27);
                     $duracionEstimadaMin = max(45, $paradasPuntos->count() * 24 + (int) round($distEstimada * 2.1));
                     $duracionRealMin = max(50, $paradasPuntos->count() * $minPorParada + (int) round($distReal * 2.3));

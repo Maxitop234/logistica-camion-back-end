@@ -8,10 +8,12 @@ use App\Models\ProyeccionFlota;
 use App\Models\Punto;
 use App\Models\Ruta;
 use App\Models\RutaPunto;
+use App\Models\Sector;
 use App\Models\TelemetriaGps;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DemoSeeder;
+use Database\Seeders\SectorSeeder;
 use Illuminate\Support\Carbon;
 use Laravel\Sanctum\Sanctum;
 
@@ -27,7 +29,7 @@ function configurarEntornoDemo(): void
     ]);
 }
 
-test('en modo demostracion queda una sola cuenta administradora, 2 choferes reales, 3 camiones demo y 5 sectores sin direcciones duplicadas', function () {
+test('en modo demostracion queda una sola cuenta administradora, 2 choferes reales, 3 camiones demo y los 12 sectores reales sin direcciones duplicadas', function () {
     configurarEntornoDemo();
 
     // Ejecutar ambos seeders en demo no debe crear la cuenta de la empresa.
@@ -48,9 +50,11 @@ test('en modo demostracion queda una sola cuenta administradora, 2 choferes real
     $puntos = Punto::all();
     expect($puntos->count())->toBe(16);
 
-    // Cubre los 5 sectores y sin direcciones duplicadas.
-    $sectores = $puntos->pluck('sector')->unique()->sort()->values()->all();
-    expect($sectores)->toBe(collect(Punto::SECTORES_VALIDOS)->sort()->values()->all());
+    // Los 12 sectores reales existen y cada punto pertenece a uno de ellos.
+    $nombresReales = collect(SectorSeeder::SECTORES)->pluck('nombre')->sort()->values()->all();
+    expect(Sector::orderBy('nombre')->pluck('nombre')->all())->toBe($nombresReales)
+        ->and($puntos->whereNull('sector_id')->count())->toBe(0)
+        ->and($puntos->every(static fn (Punto $p): bool => in_array($p->sectorResuelto(), $nombresReales, true)))->toBeTrue();
 
     $direcciones = $puntos->map(static fn (Punto $p): string => mb_strtolower(trim($p->direccion)));
     expect($direcciones->unique()->count())->toBe($puntos->count());

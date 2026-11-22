@@ -232,8 +232,9 @@ class RutaController extends Controller
                     continue;
                 }
 
-                // Captura el % de llenado real justo antes de vaciar el punto (KPI 4).
-                $porcentajeAlVaciar = $parada->punto instanceof Punto
+                // Captura el % de llenado real justo antes de vaciar el punto (KPI 4);
+                // null si el punto nunca fue medido (ADR-0013).
+                $porcentajeAlVaciar = $parada->punto instanceof Punto && $parada->punto->porcentaje_llenado !== null
                     ? (int) $parada->punto->porcentaje_llenado
                     : null;
 
@@ -246,9 +247,11 @@ class RutaController extends Controller
                     'observaciones' => $item['observaciones'] ?? null,
                 ]);
 
-                $parada->punto()->update([
+                // Vía el modelo, para recalcular la vigencia del estado (ADR-0013).
+                $parada->punto?->update([
                     'estado_llenado' => Punto::ESTADO_VACIO,
                     'porcentaje_llenado' => 0,
+                    'origen_actualizacion' => Punto::ORIGEN_RECOLECCION,
                     'ultima_actualizacion_estado' => now(),
                 ]);
             }

@@ -2,12 +2,20 @@
 
 namespace App\Http\Requests\Punto;
 
+use App\Concerns\ZonaDeOperacionValidationRules;
+use App\Enums\EstadoLlenado;
 use App\Models\Punto;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StorePuntoRequest extends FormRequest
 {
+    use ResuelveSectorDelPunto;
+    use ZonaDeOperacionValidationRules;
+
+    /** @var array<int, string> */
+    public const TIPOS_MATERIAL = ['plastico', 'vidrio', 'carton', 'mixto'];
+
     public function authorize(): bool
     {
         return true;
@@ -23,12 +31,27 @@ class StorePuntoRequest extends FormRequest
             'nombre_automatico' => ['sometimes', 'boolean'],
             'direccion' => ['required', 'string', 'min:3', 'max:255'],
             'tipo_punto' => ['required', 'string', Rule::in(Punto::TIPOS_VALIDOS)],
-            'sector' => ['sometimes', 'nullable', 'string', Rule::in(Punto::SECTORES_VALIDOS)],
-            'latitud' => ['required', 'numeric', 'between:-90,90'],
-            'longitud' => ['required', 'numeric', 'between:-180,180'],
-            'porcentaje_llenado' => ['sometimes', 'integer', 'between:0,100'],
+            'sector_id' => ['sometimes', 'nullable', 'integer', Rule::exists('sectores', 'id')->where('activo', true)],
+            'sector' => ['sometimes', 'nullable', 'string', 'max:150'],
+            'tipo_material' => ['sometimes', 'nullable', 'string', Rule::in(self::TIPOS_MATERIAL)],
+            'latitud' => $this->latitudEnZonaRules(),
+            'longitud' => $this->longitudEnZonaRules(),
+            'nota' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'porcentaje_llenado' => ['sometimes', 'nullable', 'integer', 'between:0,100'],
+            'estado_llenado' => ['sometimes', 'nullable', 'string', Rule::enum(EstadoLlenado::class)],
             'altura_contenedor_cm' => ['sometimes', 'numeric', 'between:30,500'],
             'sensor_codigo' => ['sometimes', 'nullable', 'string', 'max:64', 'unique:puntos,sensor_codigo'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            ...$this->zonaDeOperacionMessages(),
+            'sector_id.exists' => 'El sector indicado no existe o está inactivo.',
         ];
     }
 

@@ -6,6 +6,7 @@ use App\Models\Administrador;
 use App\Models\Camion;
 use App\Models\Chofer;
 use App\Models\Punto;
+use App\Models\Sector;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use RuntimeException;
@@ -16,8 +17,9 @@ class DemoSeeder extends Seeder
      * Seeder exclusivo del ambiente de demostración (`APP_DEMO_MODE=true`).
      * Crea una única cuenta administradora («Administración EcoRuta»), los 2
      * choferes de demostración (Nelson Ponce y Maximiliano González), 3 camiones
-     * de demostración y 16 puntos en direcciones reales únicas de Temuco y
-     * Padre Las Casas cubriendo los 5 sectores.
+     * de demostración, los 12 sectores reales (SectorSeeder) y 16 puntos en
+     * direcciones reales únicas de Temuco y Padre Las Casas, cada uno asignado
+     * al sector real más cercano.
      */
     public function run(): void
     {
@@ -43,6 +45,7 @@ class DemoSeeder extends Seeder
         $admin = $this->crearAdministradorDemo($adminEmail, $adminPassword);
         $choferes = $this->crearChoferesDemo($choferPassword, $admin->user_id);
         $this->crearCamionesDemo($choferes);
+        $this->call(SectorSeeder::class);
         $this->crearPuntosDemo();
     }
 
@@ -163,31 +166,38 @@ class DemoSeeder extends Seeder
 
     private function crearPuntosDemo(): void
     {
-        // 16 puntos en direcciones reales y únicas de Temuco y Padre Las Casas,
-        // cubriendo los 5 sectores sin direcciones repetidas.
+        // 16 puntos en direcciones reales y únicas de Temuco y Padre Las Casas, sin
+        // direcciones repetidas, asignados al sector real con el punto más cercano.
+        // Los 3 de Padre Las Casas quedan en Amanecer (a unos 2 km): ningún sector
+        // real cubre esa comuna.
+        $centro = 'Las Quilas, centro';
+        $sanMartin = 'S.Martin, Av.Alemania, Thiers, P.Dreves';
+        $poniente = 'Poniente';
+        $estadio = 'Avenida Estadio, Javierra carrera';
+        $puebloNuevo = 'Pueblo Nuevo, Valparaiso, Barros Arana';
+        $pedroDeValdivia = 'Pedro de Valdivia';
+        $amanecer = 'Amanecer y Amanecer Alto';
+
         $puntos = [
-            // Centro (3)
-            ['Plaza Aníbal Pinto', 'Arturo Prat 696, Temuco', Punto::TIPO_CALLE, Punto::SECTOR_CENTRO, -38.7359, -72.5904, 64, 'ESP32-DEMO-01'],
-            ['Hospital Regional de Temuco', 'Manuel Montt 115, Temuco', Punto::TIPO_CALLE, Punto::SECTOR_CENTRO, -38.7368, -72.5965, 84, 'ESP32-DEMO-02'],
-            ['Mercado Municipal de Temuco', 'Aldunate 490, Temuco', Punto::TIPO_CALLE, Punto::SECTOR_CENTRO, -38.7386, -72.5878, 92, 'ESP32-DEMO-03'],
-            // Poniente (4)
-            ['Portal Temuco', 'Av. Alemania 0671, Temuco', Punto::TIPO_CALLE, Punto::SECTOR_PONIENTE, -38.7355, -72.6155, 95, 'ESP32-DEMO-04'],
-            ['Universidad de La Frontera', 'Av. Francisco Salazar 01145, Temuco', Punto::TIPO_CALLE, Punto::SECTOR_PONIENTE, -38.7480, -72.6170, 88, 'ESP32-DEMO-05'],
-            ['Parque Estadio Germán Becker', 'Av. Pablo Neruda 01110, Temuco', Punto::TIPO_CALLE, Punto::SECTOR_PONIENTE, -38.7422, -72.6205, 76, 'ESP32-DEMO-06'],
-            ['Villa Los Ríos', 'Av. San Martín 01200, Temuco', Punto::TIPO_CONDOMINIO, Punto::SECTOR_PONIENTE, -38.7415, -72.6060, 58, 'ESP32-DEMO-07'],
-            // Oriente (3)
-            ['Feria Pinto', 'Av. Barros Arana 1150, Temuco', Punto::TIPO_CALLE, Punto::SECTOR_ORIENTE, -38.7400, -72.5765, 94, 'ESP32-DEMO-08'],
-            ['Sector Santa Rosa', 'Av. Prieto Norte 0850, Temuco', Punto::TIPO_CALLE, Punto::SECTOR_ORIENTE, -38.7310, -72.5730, 32, 'ESP32-DEMO-09'],
-            ['Costanera del Cautín', 'Av. Los Poetas 0450, Temuco', Punto::TIPO_CALLE, Punto::SECTOR_ORIENTE, -38.7510, -72.5785, 22, null],
-            // Norte (3)
-            ['Condominio Los Pablos', 'Av. Los Pablos 01950, Temuco', Punto::TIPO_CONDOMINIO, Punto::SECTOR_NORTE, -38.7180, -72.6050, 91, 'ESP32-DEMO-10'],
-            ['Sector Pueblo Nuevo', 'Av. Rudecindo Ortega 01650, Temuco', Punto::TIPO_CALLE, Punto::SECTOR_NORTE, -38.7205, -72.5800, 62, 'ESP32-DEMO-11'],
-            ['Sector Pedro de Valdivia', 'Av. Pedro de Valdivia 01850, Temuco', Punto::TIPO_CONDOMINIO, Punto::SECTOR_NORTE, -38.7155, -72.6250, 29, 'ESP32-DEMO-12'],
-            // Padre Las Casas (3)
-            ['Municipalidad de Padre Las Casas', 'Maquehue 1441, Padre Las Casas', Punto::TIPO_CALLE, Punto::SECTOR_PADRE_LAS_CASAS, -38.7700, -72.5950, 78, 'ESP32-DEMO-13'],
-            ['Pulmahue Padre Las Casas', 'Villa Alegre 0950, Padre Las Casas', Punto::TIPO_CONDOMINIO, Punto::SECTOR_PADRE_LAS_CASAS, -38.7745, -72.6080, 45, 'ESP32-DEMO-14'],
-            ['Parque Corcolén Padre Las Casas', 'Av. Guido Beck de Ramberga 0720, Padre Las Casas', Punto::TIPO_CALLE, Punto::SECTOR_PADRE_LAS_CASAS, -38.7662, -72.5872, 18, null],
+            ['Plaza Aníbal Pinto', 'Arturo Prat 696, Temuco', Punto::TIPO_CALLE, $centro, -38.7359, -72.5904, 64, 'ESP32-DEMO-01'],
+            ['Hospital Regional de Temuco', 'Manuel Montt 115, Temuco', Punto::TIPO_CALLE, $centro, -38.7368, -72.5965, 84, 'ESP32-DEMO-02'],
+            ['Mercado Municipal de Temuco', 'Aldunate 490, Temuco', Punto::TIPO_CALLE, $centro, -38.7386, -72.5878, 92, 'ESP32-DEMO-03'],
+            ['Portal Temuco', 'Av. Alemania 0671, Temuco', Punto::TIPO_CALLE, $sanMartin, -38.7355, -72.6155, 95, 'ESP32-DEMO-04'],
+            ['Universidad de La Frontera', 'Av. Francisco Salazar 01145, Temuco', Punto::TIPO_CALLE, $poniente, -38.7480, -72.6170, 88, 'ESP32-DEMO-05'],
+            ['Parque Estadio Germán Becker', 'Av. Pablo Neruda 01110, Temuco', Punto::TIPO_CALLE, $estadio, -38.7422, -72.6205, 76, 'ESP32-DEMO-06'],
+            ['Villa Los Ríos', 'Av. San Martín 01200, Temuco', Punto::TIPO_CONDOMINIO, $sanMartin, -38.7415, -72.6060, 58, 'ESP32-DEMO-07'],
+            ['Feria Pinto', 'Av. Barros Arana 1150, Temuco', Punto::TIPO_CALLE, $puebloNuevo, -38.7400, -72.5765, 94, 'ESP32-DEMO-08'],
+            ['Sector Santa Rosa', 'Av. Prieto Norte 0850, Temuco', Punto::TIPO_CALLE, $puebloNuevo, -38.7310, -72.5730, 32, 'ESP32-DEMO-09'],
+            ['Costanera del Cautín', 'Av. Los Poetas 0450, Temuco', Punto::TIPO_CALLE, $puebloNuevo, -38.7510, -72.5785, 22, null],
+            ['Condominio Los Pablos', 'Av. Los Pablos 01950, Temuco', Punto::TIPO_CONDOMINIO, $pedroDeValdivia, -38.7180, -72.6050, 91, 'ESP32-DEMO-10'],
+            ['Sector Pueblo Nuevo', 'Av. Rudecindo Ortega 01650, Temuco', Punto::TIPO_CALLE, $puebloNuevo, -38.7205, -72.5800, 62, 'ESP32-DEMO-11'],
+            ['Sector Pedro de Valdivia', 'Av. Pedro de Valdivia 01850, Temuco', Punto::TIPO_CONDOMINIO, $pedroDeValdivia, -38.7155, -72.6250, 29, 'ESP32-DEMO-12'],
+            ['Municipalidad de Padre Las Casas', 'Maquehue 1441, Padre Las Casas', Punto::TIPO_CALLE, $amanecer, -38.7700, -72.5950, 78, 'ESP32-DEMO-13'],
+            ['Pulmahue Padre Las Casas', 'Villa Alegre 0950, Padre Las Casas', Punto::TIPO_CONDOMINIO, $amanecer, -38.7745, -72.6080, 45, 'ESP32-DEMO-14'],
+            ['Parque Corcolén Padre Las Casas', 'Av. Guido Beck de Ramberga 0720, Padre Las Casas', Punto::TIPO_CALLE, $amanecer, -38.7662, -72.5872, 18, null],
         ];
+
+        $sectorIds = Sector::query()->pluck('id', 'nombre');
 
         $ahora = now();
         foreach ($puntos as [$nombre, $direccion, $tipo, $sector, $lat, $lng, $porcentaje, $sensorCodigo]) {
@@ -198,9 +208,10 @@ class DemoSeeder extends Seeder
                     'nombre_automatico' => false,
                     'direccion' => $direccion,
                     'tipo_punto' => $tipo,
-                    'sector' => $sector,
+                    'sector_id' => $sectorIds[$sector] ?? null,
                     'latitud' => $lat,
                     'longitud' => $lng,
+                    'requiere_revision' => false,
                     'estado_llenado' => Punto::clasificarEstado($porcentaje),
                     'porcentaje_llenado' => $porcentaje,
                     'ultima_actualizacion_estado' => $ahora,
