@@ -59,7 +59,7 @@ El plan de tareas anterior quedó archivado en [`_archivo/plan-original-tareas.m
 |---|---|---|---|---|---|---|
 | FE-12 | Configuración por entorno y builds de demo | P0 | BE-16 | Maximiliano | A | Pendiente |
 | FE-01 | Mapa real con OpenStreetMap (`flutter_map`) | P0 | — | Maximiliano | A | Pendiente |
-| FE-05 | Mantenedor de puntos de reciclaje y sectores | P0 | BE-03, FE-01 | Nelson | A | Pendiente |
+| FE-05 | Mantenedor de puntos de reciclaje y sectores | P0 | BE-03, FE-01 | Nelson | A | En progreso |
 | FE-09 | Licencias en la sección Choferes | P0 | BE-12 | Nelson | A | Pendiente |
 | FE-11 | Generador de rutas sobre puntos reales con mapa | P0 | BE-10, FE-01 | Maximiliano | B | Pendiente |
 | FE-04 | Eliminar los datos de ejemplo (rutas y KPI) | P0 | BE-10, BE-13 | Nelson | B–C | Pendiente |
