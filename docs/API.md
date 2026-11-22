@@ -374,5 +374,5 @@ Cada parada del recurso `Ruta` incluye además `motivo_inclusion`: `sensor`, `ma
 Las definiciones, fórmulas y metas de KPI-01 a KPI-06 están en [ADR-0009](ADR/0009-kpi-como-resultado-contra-meta.md). Con `denominador = 0`, `valor` y `cumple` son `null`: nunca se inventa un valor.
 
 - `GET /kpis/metas` / `PUT /kpis/metas/{kpi_id}` `{meta, comparador, tolerancia}`: metas editables por el administrador.
-- `GET /kpis/alertas?fecha_inicio&fecha_fin` → `{data: [{id, prioridad: "alta"|"media"|"baja", tipo, titulo, detalle, kpi_id, ruta_id?, creada_en}]}` (KPI bajo meta, tramos anómalos, sensores sin reporte, licencias por vencer).
+- `GET /kpis/alertas?fecha_inicio&fecha_fin` → `{data: [{id, tipo: "desborde"|"parada_omitida"|"desviacion_eta"|"sensor_sin_reporte"|"bateria_baja", severidad: "alta"|"media"|"baja", titulo, detalle, recomendacion, kpi, gravedad}]}`. `gravedad` es un número para comparar alertas del mismo tipo (veces superado el límite de 12 h, paradas omitidas, minutos de desvío, horas sin reporte o volts bajo el mínimo). Los KPI con serie de otra unidad que su valor (KPI-03 en horas, KPI-09 en %) indican `unidad` en cada punto de `series_linea`.
 - `GET /kpis/exportar?…&formato=pdf|csv` → archivo con `Content-Disposition: attachment; filename="kpi_2026-11.pdf"`.

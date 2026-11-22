@@ -1417,9 +1417,11 @@ class KpiCalculatorService
             'interpretacion' => $interpretacion,
             'como_se_calcula' => $formula,
             'vistas_disponibles' => ['linea', 'tabla'],
+            // La serie mide el % de acierto, no camiones: la unidad viaja en cada punto.
             'series_linea' => $evaluadas->map(static fn (ProyeccionFlota $pf): array => [
                 'etiqueta' => $pf->fecha_objetivo->format('d-m'),
                 'valor' => round((float) $pf->porcentaje_acierto, 1),
+                'unidad' => '%',
             ])->values()->all(),
             'comparacion_barras' => [],
             'tabla' => [
@@ -2595,7 +2597,11 @@ class KpiCalculatorService
             $cubos[$k] = round(($cubos[$k] ?? 0.0) + $this->horasDeRuta($r), 1);
         }
 
-        return $this->mapearSerie($cubos);
+        // KPI-03 se expresa en %, pero esta serie son horas de ruta.
+        return array_map(
+            static fn (array $item): array => $item + ['unidad' => 'h'],
+            $this->mapearSerie($cubos),
+        );
     }
 
     /**

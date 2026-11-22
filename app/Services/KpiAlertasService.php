@@ -16,7 +16,9 @@ class KpiAlertasService
     /**
      * Genera alertas accionables y recomendaciones en el backend para el período
      * solicitado (desbordes > 12 h, puntos crónicos, paradas omitidas, desvíos
-     * ETA, sensores sin reporte ≥ 8 h y batería < 3,40 V).
+     * ETA, sensores sin reporte ≥ 8 h y batería < 3,40 V). Cada alerta trae
+     * `gravedad`, un número comparable dentro de su tipo (veces superado, paradas
+     * omitidas, minutos de desvío, horas sin reporte o volts bajo el mínimo).
      *
      * @return list<array<string, mixed>>
      */
@@ -32,14 +34,16 @@ class KpiAlertasService
         // 1. Puntos crónicos / desbordes > 12 h (KPI-05).
         $kpi05 = $kpis->get('KPI-05');
         foreach ($kpi05['extras']['puntos_cronicos'] ?? [] as $cronico) {
+            $enSector = $cronico['sector'] === Punto::SIN_SECTOR ? '' : " en el sector {$cronico['sector']}";
             $alertas[] = [
                 'id' => "desborde-cronico-{$cronico['punto_id']}-{$finDia->format('Y-m-d')}",
                 'tipo' => 'desborde',
                 'severidad' => 'alta',
                 'titulo' => "Punto crónico de desborde: {$cronico['nombre']}",
-                'detalle' => "Superó {$cronico['superaron_12h']} veces el límite de 12 h lleno en el sector {$cronico['sector']} (máx. {$cronico['max_horas']} h).",
+                'detalle' => "Superó {$cronico['superaron_12h']} veces el límite de 12 h lleno{$enSector} (máx. {$cronico['max_horas']} h).",
                 'recomendacion' => 'Aumentar frecuencia de recolección o evaluar ampliación de capacidad en este sector.',
                 'kpi' => 'KPI-05',
+                'gravedad' => (float) $cronico['superaron_12h'],
             ];
         }
 
@@ -62,6 +66,7 @@ class KpiAlertasService
                     'detalle' => "Quedaron pendientes: {$nombres}.",
                     'recomendacion' => 'Priorizar estos puntos en la próxima generación de rutas.',
                     'kpi' => 'KPI-07',
+                    'gravedad' => (float) $omitidas->count(),
                 ];
             }
 
@@ -88,6 +93,7 @@ class KpiAlertasService
                             ? 'Ajustar holgura de tiempos estimados para las próximas rutas de ese sector.'
                             : 'Revisar tiempos de parada para evitar sobrestimar la jornada.',
                         'kpi' => 'KPI-07',
+                        'gravedad' => abs($prom),
                     ];
                 }
             }
@@ -119,6 +125,7 @@ class KpiAlertasService
                     'detalle' => $detalle,
                     'recomendacion' => 'Revisar conectividad o alimentación del ESP32 en terreno.',
                     'kpi' => 'KPI-08',
+                    'gravedad' => $horasSinReporte ?? 9999.0,
                 ];
             }
 
@@ -132,6 +139,7 @@ class KpiAlertasService
                     'detalle' => 'Está bajo el mínimo recomendado de 3,40 V.',
                     'recomendacion' => 'Programar cambio o recarga de batería en la próxima visita.',
                     'kpi' => 'KPI-08',
+                    'gravedad' => round(KpiCalculatorService::VOLTAJE_MINIMO_BATERIA - (float) $punto->bateria_voltaje, 2),
                 ];
             }
         }

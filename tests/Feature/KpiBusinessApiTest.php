@@ -562,3 +562,97 @@ it('valida que el sector exista y exporta reportes válidos en PDF (DomPDF) y CS
     expect($pdfResp->headers->get('content-type'))->toContain('application/pdf')
         ->and(str_starts_with((string) $pdfResp->getContent(), '%PDF-'))->toBeTrue();
 });
+
+/**
+ * Tres episodios de 15 h llenos (> 12 h) en un punto: lo vuelve crónico.
+ */
+function episodiosCronicos(Punto $punto): void
+{
+    foreach ([2, 5, 8] as $dia) {
+        LecturaPunto::create([
+            'punto_id' => $punto->id, 'origen' => Punto::ORIGEN_SENSOR_IOT,
+            'porcentaje_llenado' => 95, 'estado_llenado' => Punto::ESTADO_LLENO,
+            'medido_en' => Carbon::parse("2026-11-0{$dia} 06:00:00"),
+        ]);
+        LecturaPunto::create([
+            'punto_id' => $punto->id, 'origen' => Punto::ORIGEN_MANUAL,
+            'porcentaje_llenado' => 0, 'estado_llenado' => Punto::ESTADO_VACIO,
+            'medido_en' => Carbon::parse("2026-11-0{$dia} 21:00:00"),
+        ]);
+    }
+}
+
+it('las alertas nombran el sector real del punto (relación sector) y traen gravedad', function (): void {
+    $conSector = Punto::create([
+        'nombre' => 'Feria Pinto', 'direccion' => 'Barros Arana 1150', 'tipo_punto' => Punto::TIPO_CALLE,
+        'sector_id' => sectorKpi('Centro'), 'latitud' => -38.74, 'longitud' => -72.585,
+        'porcentaje_llenado' => 95, 'estado_llenado' => Punto::ESTADO_LLENO, 'activo' => true,
+    ]);
+    $sinSector = Punto::create([
+        'nombre' => 'Plaza Sur', 'direccion' => 'Maquehue 1400', 'tipo_punto' => Punto::TIPO_CALLE,
+        'sector_id' => null, 'latitud' => -38.77, 'longitud' => -72.595,
+        'porcentaje_llenado' => 95, 'estado_llenado' => Punto::ESTADO_LLENO, 'activo' => true,
+    ]);
+    episodiosCronicos($conSector);
+    episodiosCronicos($sinSector);
+
+    $alertas = collect($this->actingAs($this->admin, 'sanctum')
+        ->getJson('/api/v1/kpis/alertas?fecha_inicio=2026-11-01&fecha_fin=2026-11-12')
+        ->assertOk()
+        ->json('data'))->where('tipo', 'desborde')->keyBy(fn (array $a) => $a['titulo']);
+
+    $a = $alertas['Punto crónico de desborde: Feria Pinto'];
+    expect($a['detalle'])->toContain('en el sector Centro')
+        ->and($a['detalle'])->not->toContain('Sin sector')
+        ->and((float) $a['gravedad'])->toBe(3.0);
+
+    // Un punto sin sector no dice "en el sector Sin sector".
+    expect($alertas['Punto crónico de desborde: Plaza Sur']['detalle'])->not->toContain('Sin sector');
+});
+
+it('KPI-09 declara % en su serie y KPI-03 declara horas', function (): void {
+    $camion = Camion::factory()->create();
+    $ayer = today()->subDay();
+    $p1 = Punto::create([
+        'nombre' => 'Proy 1', 'direccion' => 'D1', 'tipo_punto' => Punto::TIPO_CALLE,
+        'sector_id' => sectorKpi('Centro'), 'latitud' => -38.735, 'longitud' => -72.59,
+        'porcentaje_llenado' => 75, 'estado_llenado' => Punto::ESTADO_ALTO, 'activo' => true,
+    ]);
+    LecturaPunto::create([
+        'punto_id' => $p1->id, 'origen' => Punto::ORIGEN_SENSOR_IOT,
+        'porcentaje_llenado' => 50, 'estado_llenado' => Punto::ESTADO_MEDIO,
+        'medido_en' => $ayer->copy()->setTime(8, 0),
+    ]);
+    LecturaPunto::create([
+        'punto_id' => $p1->id, 'origen' => Punto::ORIGEN_SENSOR_IOT,
+        'porcentaje_llenado' => 75, 'estado_llenado' => Punto::ESTADO_ALTO,
+        'medido_en' => $ayer->copy()->setTime(20, 0),
+    ]);
+    $ruta = Ruta::create([
+        'camion_id' => $camion->id, 'chofer_id' => $this->chofer->id,
+        'creado_por_admin_id' => $this->adminPerfil->id,
+        'fecha_programada' => $ayer->format('Y-m-d'), 'estado' => Ruta::ESTADO_COMPLETADA,
+        'total_puntos_evaluados' => 1, 'puntos_incluidos_count' => 1, 'puntos_excluidos_count' => 0,
+        'distancia_estimada_km' => 5.0, 'distancia_real_km' => 5.0, 'duracion_estimada_min' => 30,
+    ]);
+    RutaPunto::create([
+        'ruta_id' => $ruta->id, 'punto_id' => $p1->id, 'orden_parada' => 1,
+        'estado_llenado_inicial' => Punto::ESTADO_ALTO, 'estado_parada' => RutaPunto::ESTADO_RECOLECTADO,
+    ]);
+    ProyeccionFlota::create([
+        'fecha_objetivo' => $ayer->format('Y-m-d'), 'puntos_proyectados' => 1,
+        'camiones_proyectados' => 1, 'calculada_en' => $ayer->copy()->subDay(),
+    ]);
+
+    $json = $this->actingAs($this->admin, 'sanctum')->getJson('/api/v1/kpis/dashboard')->assertOk()->json();
+
+    $kpi09 = kpiPorId($json, 'KPI-09');
+    expect($kpi09['unidad'])->toBe('camiones')
+        ->and($kpi09['series_linea'])->not->toBeEmpty()
+        ->and(collect($kpi09['series_linea'])->pluck('unidad')->unique()->all())->toBe(['%']);
+
+    $kpi03 = kpiPorId($json, 'KPI-03');
+    foreach ($kpi03['series_linea'] as $item) {
+        expect($item['unidad'])->toBe('h');
+    }
+});
