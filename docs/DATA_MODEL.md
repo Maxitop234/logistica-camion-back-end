@@ -66,7 +66,7 @@ erDiagram
 > BE-12 agrega `peso_bruto_vehicular_kg` (decimal 8,2) para validar la clase de licencia requerida.
 
 ### `audit_logs`
-`id`, `user_id` (nullable), `accion` (`login`, `logout`, `failed_login`; BE-02 agrega `camion_desactivado`, `chofer_desactivado`, `licencia_verificada`, `ruta_generada`, `token_iot_rotado`), `ip_address`, `user_agent`, `detalles` (jsonb, **sin datos personales**), `created_at`. Índice `(user_id, created_at)`.
+`id`, `user_id` (nullable), `accion` (`login`, `logout`, `failed_login`; BE-02 agrega `camion_desactivado`, `chofer_desactivado`, `licencia_verificada`, `ruta_generada`, `ruta_cancelada`, `token_iot_rotado`), `ip_address`, `user_agent`, `detalles` (jsonb, **sin datos personales**), `created_at`. Índice `(user_id, created_at)`.
 
 ### Tablas del framework
 `personal_access_tokens` (Sanctum; `name` = `device_name`), `password_reset_tokens`, `sessions`, `cache`, `jobs`, `passkeys` (Fortify, sin uso en la API; evaluar en BE-02).
@@ -148,7 +148,7 @@ Los 12 sectores reales (planilla de georreferenciación, cierre de mayo de 2026)
 > Los puntos conservan `sensor_codigo`, `bateria_voltaje` y `ultimo_heartbeat_iot` como reflejo del dispositivo asignado (los leen KPI y mapas); `sensor_token_hash` solo queda para tokens anteriores aún no migrados.
 
 ### `rutas` (BE-10)
-`id`, `camion_id` (FK restrict), `chofer_id` (FK restrict), `creada_por_user_id` (FK null), `fecha_programada` (date), `estado` (`planificada`, `en_curso`, `completada`, `cancelada`), `modo_calculo` (`osrm`, `proximidad`), `total_puntos_evaluados`, `puntos_incluidos_count`, `puntos_excluidos_count` (smallint), `distancia_estimada_km` (decimal 6,2), `duracion_estimada_min` (smallint), `encoded_polyline` (text), `hora_inicio_real`, `hora_termino_real` (timestampTz null), `motivo_cancelacion` (text null), timestamps.
+`id`, `camion_id` (FK restrict), `chofer_id` (FK restrict), `creada_por_user_id` (FK null), `fecha_programada` (date), `estado` (`planificada`, `en_curso`, `completada`, `cancelada`), `modo_calculo` (`osrm`, `proximidad`), `total_puntos_evaluados`, `puntos_incluidos_count`, `puntos_excluidos_count` (smallint), `distancia_estimada_km` (decimal 6,2), `duracion_estimada_min` (smallint), `encoded_polyline` (text), `hora_inicio_real`, `hora_termino_real` (timestampTz null), `motivo_cancelacion` (text null), `cancelada_en` (timestampTz null), `cancelada_por_admin_id` (FK null → `administradores`), timestamps.
 Índices: `(fecha_programada, estado)`, `chofer_id`, `camion_id`. Restricción: una ruta no cancelada por camión y fecha.
 
 ### `ruta_puntos` — paradas (BE-10, BE-11)

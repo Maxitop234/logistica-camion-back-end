@@ -168,6 +168,62 @@ class RutaController extends Controller
     }
 
     /**
+     * Cancela una ruta planificada o en curso (administrador). Las paradas ya recolectadas se
+     * conservan; las pendientes quedan libres para futuras rutas y el camión vuelve a disponible.
+     */
+    public function cancelar(Request $request, Ruta $ruta): RutaResource|JsonResponse
+    {
+        $datos = $request->validate([
+            'motivo' => ['required', 'string', 'min:3', 'max:500'],
+        ], [
+            'motivo.required' => 'Indica el motivo de la cancelación.',
+            'motivo.min' => 'El motivo debe tener al menos 3 caracteres.',
+        ]);
+
+        $cancelada = DB::transaction(function () use ($ruta, $datos, $request): bool {
+            $bloqueada = Ruta::whereKey($ruta->id)->lockForUpdate()->first();
+            if (! $bloqueada instanceof Ruta
+                || ! in_array($bloqueada->estado, [Ruta::ESTADO_PLANIFICADA, Ruta::ESTADO_EN_CURSO], true)) {
+                return false;
+            }
+
+            $estabaEnCurso = $bloqueada->estado === Ruta::ESTADO_EN_CURSO;
+
+            $bloqueada->update([
+                'estado' => Ruta::ESTADO_CANCELADA,
+                'motivo_cancelacion' => trim($datos['motivo']),
+                'cancelada_en' => now(),
+                'cancelada_por_admin_id' => $request->user()?->administrador?->id,
+                'hora_termino_real' => $estabaEnCurso ? now() : null,
+            ]);
+
+            // Solo libera el camión si esta ruta lo tenía en_ruta (no pisa mantenimiento ni inactivo).
+            Camion::whereKey($bloqueada->camion_id)
+                ->where('estado_operativo', 'en_ruta')
+                ->update(['estado_operativo' => 'disponible']);
+
+            AuditLog::registrar('ruta_cancelada', $request->user(), $request, [
+                'ruta_id' => $bloqueada->id,
+                'camion_id' => $bloqueada->camion_id,
+                'chofer_id' => $bloqueada->chofer_id,
+                'estaba_en_curso' => $estabaEnCurso,
+                'paradas_recolectadas' => $bloqueada->paradas()->where('estado_parada', RutaPunto::ESTADO_RECOLECTADO)->count(),
+                'paradas_liberadas' => $bloqueada->paradas()->where('estado_parada', RutaPunto::ESTADO_PENDIENTE)->count(),
+            ]);
+
+            return true;
+        });
+
+        if (! $cancelada) {
+            return response()->json([
+                'message' => 'Solo se pueden cancelar rutas planificadas o en curso.',
+            ], 409);
+        }
+
+        return new RutaResource($ruta->fresh()->load(self::RELACIONES));
+    }
+
+    /**
      * Devuelve la ruta activa (`en_curso` o `planificada`) del chofer autenticado, o `data: null`.
      */
     public function rutaActiva(Request $request): JsonResponse|RutaResource
@@ -186,7 +242,21 @@ class RutaController extends Controller
             ->first();
 
         if (! $ruta instanceof Ruta) {
-            return response()->json(['data' => null]);
+            // Aviso para el chofer: la última ruta que el administrador canceló en las últimas 24 h.
+            $cancelada = Ruta::where('chofer_id', $chofer->id)
+                ->where('estado', Ruta::ESTADO_CANCELADA)
+                ->where('cancelada_en', '>=', now()->subDay())
+                ->orderByDesc('cancelada_en')
+                ->first();
+
+            return response()->json([
+                'data' => null,
+                'cancelada' => $cancelada instanceof Ruta ? [
+                    'id' => $cancelada->id,
+                    'motivo' => $cancelada->motivo_cancelacion,
+                    'cancelada_en' => $cancelada->cancelada_en?->toIso8601String(),
+                ] : null,
+            ]);
         }
 
         return new RutaResource($ruta);

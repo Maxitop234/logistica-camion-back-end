@@ -38,6 +38,8 @@ class RutaResource extends JsonResource
             'encoded_polyline' => $this->encoded_polyline,
             'hora_inicio_real' => $this->hora_inicio_real?->toIso8601String(),
             'hora_termino_real' => $this->hora_termino_real?->toIso8601String(),
+            'motivo_cancelacion' => $this->motivo_cancelacion,
+            'cancelada_en' => $this->cancelada_en?->toIso8601String(),
             'paradas' => RutaPuntoResource::collection($this->whenLoaded('paradas')),
         ];
     }

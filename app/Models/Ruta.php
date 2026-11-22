@@ -25,6 +25,9 @@ use Illuminate\Support\Carbon;
  * @property string|null $encoded_polyline
  * @property Carbon|null $hora_inicio_real
  * @property Carbon|null $hora_termino_real
+ * @property string|null $motivo_cancelacion
+ * @property Carbon|null $cancelada_en
+ * @property int|null $cancelada_por_admin_id
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -44,6 +47,9 @@ use Illuminate\Support\Carbon;
     'encoded_polyline',
     'hora_inicio_real',
     'hora_termino_real',
+    'motivo_cancelacion',
+    'cancelada_en',
+    'cancelada_por_admin_id',
 ])]
 class Ruta extends Model
 {
@@ -69,6 +75,7 @@ class Ruta extends Model
             'duracion_estimada_min' => 'integer',
             'hora_inicio_real' => 'datetime',
             'hora_termino_real' => 'datetime',
+            'cancelada_en' => 'datetime',
         ];
     }
 

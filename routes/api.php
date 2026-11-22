@@ -107,6 +107,7 @@ Route::prefix('v1')->group(function () {
 
         Route::get('rutas', [RutaController::class, 'index']);
         Route::post('rutas/generar', [RutaController::class, 'generar']);
+        Route::post('rutas/{ruta}/cancelar', [RutaController::class, 'cancelar']);
         Route::get('rutas/{ruta}/traza', [GpsController::class, 'traza']);
         Route::get('gps/flota', [GpsController::class, 'flota']);
         Route::get('rutas/{ruta}/desvios', [DesvioController::class, 'porRuta']);
