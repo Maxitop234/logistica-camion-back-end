@@ -44,6 +44,8 @@ flutter build web --release --dart-define=API_BASE_URL=https://<servicio>.onrend
 - **Manual:** arrastrar la carpeta `build/web` a https://app.netlify.com/drop (o a "Deploys" del sitio).
 - **Una línea (CLI):** `netlify deploy --prod --dir=build/web` (requiere `npm i -g netlify-cli` y `netlify login`; la primera vez `netlify link`).
 
+**Mapas:** la demo usa las teselas públicas de OpenStreetMap. En el ambiente real la empresa debe usar un proveedor de teselas con su propia cuenta, según la [política de uso de teselas de la OSM Foundation](https://operations.osmfoundation.org/policies/tiles/); la URL, la atribución y el área del mapa se configuran con `--dart-define` (ver `docs/DESPLIEGUE.md` del frontend).
+
 Las subidas manuales no ejecutan build: lo que esté en `build/web` es lo que se publica.
 
 ## APK
