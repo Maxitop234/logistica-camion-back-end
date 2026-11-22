@@ -206,6 +206,14 @@ class Chofer extends Model
     }
 
     /**
+     * @return HasMany<Ruta, $this>
+     */
+    public function rutas(): HasMany
+    {
+        return $this->hasMany(Ruta::class);
+    }
+
+    /**
      * @return HasOne<Camion, $this>
      */
     public function camionActual(): HasOne

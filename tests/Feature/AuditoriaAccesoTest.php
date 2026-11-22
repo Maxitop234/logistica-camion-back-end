@@ -123,3 +123,27 @@ test('no se inicia una ruta con el camión inactivo o en mantenimiento', functio
     $this->actingAs($this->chofer->user, 'sanctum')->postJson("/api/v1/rutas/{$this->ruta->id}/iniciar")->assertStatus(422);
     expect($this->camion->fresh()->estado_operativo)->toBe('mantenimiento');
 });
+
+test('no se desactiva un chofer con una ruta en curso', function () {
+    $this->camion->update(['estado_operativo' => 'en_ruta']);
+    $this->actingAs($this->adminUser, 'sanctum')
+        ->deleteJson("/api/v1/choferes/{$this->chofer->id}", ['motivo' => 'prueba'])
+        ->assertStatus(409);
+    expect($this->chofer->user->fresh()->is_active)->toBeTrue()
+        ->and($this->camion->fresh()->chofer_actual_id)->toBe($this->chofer->id);
+});
+
+test('una parada ya recolectada no se vuelve a registrar con otro sync_uuid', function () {
+    $punto = Punto::factory()->lleno()->create();
+    $this->ruta->paradas()->create([
+        'punto_id' => $punto->id, 'orden_parada' => 1, 'estado_llenado_inicial' => 'lleno', 'estado_parada' => 'pendiente',
+    ]);
+    $horaOriginal = now()->subHour()->startOfSecond();
+    $envio = fn (string $uuid, $hora) => $this->actingAs($this->chofer->user, 'sanctum')
+        ->postJson("/api/v1/rutas/{$this->ruta->id}/sincronizar-lote", ['recolecciones' => [[
+            'punto_id' => $punto->id, 'sync_uuid' => $uuid, 'hora_real_recoleccion' => $hora->toIso8601String(),
+        ]]])->assertOk();
+    $envio((string) Str::uuid(), $horaOriginal);
+    $envio((string) Str::uuid(), now());
+    expect($this->ruta->paradas()->first()->hora_real_recoleccion->timestamp)->toBe($horaOriginal->timestamp);
+});

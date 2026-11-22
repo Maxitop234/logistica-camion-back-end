@@ -257,7 +257,7 @@ class RutaController extends Controller
                     ->where('punto_id', $item['punto_id'])
                     ->first();
 
-                if (! $parada instanceof RutaPunto) {
+                if (! $parada instanceof RutaPunto || $parada->estado_parada === RutaPunto::ESTADO_RECOLECTADO) {
                     continue;
                 }
 

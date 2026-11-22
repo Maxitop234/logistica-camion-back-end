@@ -11,6 +11,7 @@ use App\Http\Resources\ChoferResource;
 use App\Models\AuditLog;
 use App\Models\Chofer;
 use App\Models\NotificacionChofer;
+use App\Models\Ruta;
 use App\Models\SolicitudReactivacionChofer;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -90,8 +91,12 @@ class ChoferController extends Controller
      * Desactiva la cuenta (is_active = false), guarda el motivo, inicia un
      * nuevo ciclo de desactivación, revoca tokens, libera su camión y audita.
      */
-    public function destroy(DestroyChoferRequest $request, Chofer $chofer): Response
+    public function destroy(DestroyChoferRequest $request, Chofer $chofer): Response|JsonResponse
     {
+        if ($chofer->rutas()->where('estado', Ruta::ESTADO_EN_CURSO)->exists()) {
+            return response()->json(['message' => 'No se puede desactivar al chofer: tiene una ruta en curso.'], 409);
+        }
+
         $motivo = $request->validated('motivo') ?? 'Desactivado por el administrador';
 
         DB::transaction(function () use ($chofer, $motivo, $request): void {
