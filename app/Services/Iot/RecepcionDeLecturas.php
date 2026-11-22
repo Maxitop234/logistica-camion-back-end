@@ -42,6 +42,10 @@ class RecepcionDeLecturas
         $datos = Validator::make($datos, StoreIotLecturaRequest::reglas(), StoreIotLecturaRequest::mensajes())->validate();
         $recibidoEn ??= now();
         $medidoEn = isset($datos['medido_en']) ? Carbon::parse((string) $datos['medido_en']) : $recibidoEn;
+        // Un reloj del sensor adelantado no debe dejar el estado "vigente" por tiempo indefinido.
+        if ($medidoEn->greaterThan($recibidoEn->copy()->addMinutes(5))) {
+            $medidoEn = Carbon::instance($recibidoEn);
+        }
 
         if (! $dispositivo instanceof Dispositivo) {
             return $this->recibirConTokenAntiguo($hash, $datos, $medidoEn, $recibidoEn);

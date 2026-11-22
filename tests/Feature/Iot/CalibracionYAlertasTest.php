@@ -125,3 +125,14 @@ test('se edita la calibracion y el intervalo con validacion', function () {
         ->assertJsonPath('data.distancia_lleno_cm', 5)
         ->assertJsonPath('data.zona_ciega_cm', 2);
 });
+
+test('una lectura con la hora del sensor en el futuro se registra con la hora del servidor', function () {
+    $punto = Punto::factory()->create();
+    Dispositivo::factory()->conToken('eco_iot_f1')->create(['punto_id' => $punto->id, 'altura_contenedor_cm' => 120]);
+
+    $this->withHeader('X-IoT-Token', 'eco_iot_f1')
+        ->postJson('/api/v1/iot/lecturas', ['distancia_cm' => 30, 'lectura_uuid' => 'f-1', 'medido_en' => now()->addYear()->toIso8601String()])
+        ->assertCreated();
+
+    expect($punto->fresh()->ultima_actualizacion_estado->lessThanOrEqualTo(now()->addMinute()))->toBeTrue();
+});
