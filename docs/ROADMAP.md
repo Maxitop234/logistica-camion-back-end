@@ -67,7 +67,7 @@ El detalle de cada tarea está en [`tasks/README.md`](../tasks/README.md).
 
 | Riesgo | Impacto | Mitigación |
 |---|---|---|
-| Las coordenadas de los puntos aún no están digitalizadas | Sin puntos reales en el mapa | Completar **esta semana** el CSV de importación (formato en BE-04); plan B: captura manual en FE-05 |
+| Las coordenadas de los puntos aún no están digitalizadas | Sin puntos reales en el mapa | **Mitigado:** la planilla del equipo ya trae los 504 puntos con coordenadas y se carga con `puntos:importar` (BE-04). Falta confirmar con la empresa las diferencias con `puntos_esperados`; plan B: captura manual en FE-05 |
 | Solo dos sensores para cientos de puntos | La ruta "dinámica" casi no excluye puntos | Explicitarlo (ADR-0013): exclusión donde hay datos, calendario donde no; KPI-04 mide el problema |
 | Choferes o empresa sin disponibilidad para rutas reales | KPI vacíos | Coordinar con los dueños desde el Sprint A; como mínimo, recorridos reales hechos por el equipo con la app, declarados como tales |
 | Componentes del sensor sin llegar a tiempo | Sin piloto IoT | Comprar esta semana (DOC-01); un nodo funcional en un contenedor de prueba documentado vale más que dos a medias |
