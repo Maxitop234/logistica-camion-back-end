@@ -96,10 +96,10 @@ Los 12 sectores reales (planilla de georreferenciación, cierre de mayo de 2026)
 | `tipo_material` | string(16) null | `plastico`, `vidrio`, `carton`, `mixto` (confirmar con la empresa) |
 | `latitud`, `longitud` | decimal(10,7) | Dentro de la caja de la zona de operación (`config/ecoruta.php`, `ZONA_*`) |
 | `ubicacion` | geography(Point,4326) | **Columna generada** por PostgreSQL desde `latitud`/`longitud` (siempre sincronizada); índice GiST |
-| `fuente_ubicacion` | string(16) | `coordenadas`, `geocodificada`, `manual` (por defecto `manual`) |
+| `fuente_ubicacion` | string(16) | `coordenadas` o `geocodificada` (importación BE-04), `manual` (por defecto; también al mover el punto en el panel, y entonces una reimportación conserva su ubicación) |
 | `requiere_revision` | bool | Coordenada dudosa, sector sugerido automáticamente, punto dado de baja en terreno o fuera de la zona |
 | `nota` | text null | Nota libre (importación o propuesta del chofer) |
-| `codigo_externo` | string(64) null, único | Identificador estable de la fila en el archivo de importación (BE-04) |
+| `codigo_externo` | string(64) null, único | Identificador estable de la fila en el archivo de importación (BE-04): SHA-256 de sector + nombre + dirección normalizados, con `#n` cuando la misma combinación se repite en el sector con otra ubicación. `null` en los puntos creados desde la API |
 | `estado_llenado` | string null | `vacio`, `bajo`, `medio`, `alto`, `lleno` (enum `EstadoLlenado`); `null` = nunca medido |
 | `porcentaje_llenado` | smallint 0–100 null | `null` = nunca medido o estado ajustado sin porcentaje |
 | `peso_actual_kg` | decimal(6,2) null | |
