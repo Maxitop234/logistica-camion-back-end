@@ -43,9 +43,9 @@ test('un chofer no ve ni modifica rutas ajenas', function () {
 
 test('un chofer no registra motivo en desvíos ajenos ni los ve en su lista', function () {
     $d = DesvioRuta::create([
-        'ruta_id' => $this->ruta->id, 'chofer_id' => $this->chofer->id,
+        'ruta_id' => $this->ruta->id, 'chofer_id' => $this->chofer->id, 'camion_id' => $this->ruta->camion_id,
         'inicio_en' => now()->subHour(), 'fin_en' => now(), 'distancia_m' => 100, 'max_separacion_m' => 60,
-        'geometria_real' => [], 'geometria_planificada' => [], 'clave_tramo' => 'x', 'centro_latitud' => -38.7, 'centro_longitud' => -72.6,
+        'geometria_real' => '', 'geometria_planificada' => '', 'clave_tramo' => 'x', 'centro_latitud' => -38.7, 'centro_longitud' => -72.6,
     ]);
     $this->actingAs($this->otro->user, 'sanctum')->putJson("/api/v1/chofer/desvios/{$d->id}/motivo", ['motivo_codigo' => 'otro'])->assertForbidden();
     $this->actingAs($this->otro->user, 'sanctum')->getJson('/api/v1/chofer/desvios?todos=1')->assertOk()->assertJsonCount(0, 'data');
