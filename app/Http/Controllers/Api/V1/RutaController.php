@@ -35,6 +35,13 @@ class RutaController extends Controller
      */
     public function index(Request $request): AnonymousResourceCollection
     {
+        $request->validate([
+            'fecha_programada' => ['nullable', 'date_format:Y-m-d'],
+            'estado' => ['nullable', 'string', 'max:30'],
+            'chofer_id' => ['nullable', 'integer'],
+            'camion_id' => ['nullable', 'integer'],
+        ]);
+
         $query = Ruta::with(self::RELACIONES)->orderByDesc('fecha_programada')->orderByDesc('id');
 
         if (is_string($request->query('fecha_programada')) && $request->query('fecha_programada') !== '') {
@@ -197,6 +204,10 @@ class RutaController extends Controller
 
         if ($ruta->estado !== Ruta::ESTADO_PLANIFICADA) {
             return response()->json(['message' => 'Solo se pueden iniciar rutas en estado planificada.'], 422);
+        }
+
+        if ($ruta->camion?->estado_operativo !== 'disponible') {
+            return response()->json(['message' => 'El camión de esta ruta no está disponible. Avisa al administrador.'], 422);
         }
 
         DB::transaction(function () use ($ruta, $request): void {

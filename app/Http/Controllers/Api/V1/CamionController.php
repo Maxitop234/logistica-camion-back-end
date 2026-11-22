@@ -33,11 +33,15 @@ class CamionController extends Controller
         return new CamionResource($camion->load('choferActual'));
     }
 
-    public function update(UpdateCamionRequest $request, Camion $camion): CamionResource
+    public function update(UpdateCamionRequest $request, Camion $camion): CamionResource|JsonResponse
     {
         $datos = $request->validated();
         $estabaInactivo = $camion->estado_operativo === 'inactivo';
         $estadoNuevo = $datos['estado_operativo'] ?? $camion->estado_operativo;
+
+        if ($camion->estado_operativo === 'en_ruta' && $estadoNuevo !== 'en_ruta') {
+            return response()->json(['message' => 'No se puede cambiar el estado de un camión en ruta.'], 409);
+        }
         $estaReactivando = $estabaInactivo && $estadoNuevo !== 'inactivo';
 
         DB::transaction(function () use ($camion, $datos, $estaReactivando, $estadoNuevo, $request): void {
