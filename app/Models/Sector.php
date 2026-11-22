@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * Sector de recolección de Somos Terranova: agrupa puntos de reciclaje que se
@@ -110,6 +111,65 @@ class Sector extends Model
         sort($unicos);
 
         return $unicos;
+    }
+
+    /**
+     * Interpreta los días de recolección escritos en una planilla: números ISO
+     * (`2|4`), nombres (`martes, jueves`) o abreviaturas (`mar|jue`), con o
+     * sin tildes, separados por `|`, comas, punto y coma o espacios.
+     *
+     * @return array<int, int>|null Días ISO normalizados; `null` si algún día no se reconoce
+     */
+    public static function diasDesdeTexto(string $texto): ?array
+    {
+        $fragmentos = preg_split('/[|,;\/\s]+/u', Str::lower(Str::ascii($texto)), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        $dias = [];
+        foreach ($fragmentos as $fragmento) {
+            if ($fragmento === 'y') {
+                continue;
+            }
+
+            $dia = ctype_digit($fragmento) ? (int) $fragmento : self::diaDesdeNombre($fragmento);
+            if ($dia === null || $dia < 1 || $dia > 7) {
+                return null;
+            }
+            $dias[] = $dia;
+        }
+
+        return $dias === [] ? null : self::normalizarDias($dias);
+    }
+
+    /**
+     * Día ISO de un nombre o abreviatura de al menos dos letras (`mi` → 3).
+     */
+    private static function diaDesdeNombre(string $fragmento): ?int
+    {
+        if (strlen($fragmento) < 2) {
+            return null;
+        }
+
+        foreach (self::NOMBRES_DIAS as $dia => $nombre) {
+            if (str_starts_with(Str::ascii($nombre), $fragmento)) {
+                return $dia;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Clave para reconocer un sector por su nombre aunque la planilla lo escriba
+     * con otra puntuación, tildes, mayúsculas o un paréntesis descriptivo:
+     * "Villa San Andres , Fdo Las Mariposas" y "Villa San Andres, Fdo Las
+     * Mariposas" dan la misma clave.
+     */
+    public static function claveDeNombre(string $nombre): string
+    {
+        $sinParentesis = (string) preg_replace('/\([^)]*\)?/u', ' ', $nombre);
+        $soloLetrasYNumeros = (string) preg_replace('/[^a-z0-9]+/', ' ', Str::lower(Str::ascii($sinParentesis)));
+
+        return trim($soloLetrasYNumeros);
     }
 
     /**

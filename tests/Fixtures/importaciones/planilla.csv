@@ -1,0 +1,7 @@
+sector_n,sector,punto_n,nombre,referencia,direccion,fuente_direccion,lat,lng,tipo,agregado,dias,frecuencia_semanal,obs,maps_url
+1,"Sector Prueba Norte , Villa Uno",1,Condominio Prueba Uno,Condominio,"Pasaje Ficticio 10, Temuco, Araucanía",Google Maps,-38.7100000,-72.5600000,Dirección / lugar,2026-01-10,"martes, jueves",2,,
+1,"Sector Prueba Norte , Villa Uno",2,Labranza,,"Labranza, Temuco, Araucanía",Google Maps,-38.7700000,-72.7600000,Dirección / lugar,2026-01-10,"martes, jueves",2,,
+1,"Sector Prueba Norte , Villa Uno",3,Labranza,,"Labranza, Temuco, Araucanía",Google Maps,-38.7600000,-72.7400000,Dirección / lugar,2026-01-10,"martes, jueves",2,,
+1,"Sector Prueba Norte , Villa Uno",4,Labranza,,"Labranza, Temuco, Araucanía",Google Maps,-38.7700000,-72.7600000,Dirección / lugar,2026-01-10,"martes, jueves",2,Duplicado en el mismo sector (punto 2),
+2,Sector Prueba Sur (Villa Dos y Villa Tres),1,"38°45'44.5""S 72°45'42.8""W",,"Calle Ficticia 0460, Villa Prueba, Labranza, Temuco",Google Maps,-38.7623611,-72.7618889,Pin (solo coordenadas),2026-02-01,"lunes, viernes",3,,
+2,Sector Prueba Sur (Villa Dos y Villa Tres),2,Condominio Prueba Uno,Condominio,"Pasaje Ficticio 10, Temuco, Araucanía",Google Maps,-38.7100000,-72.5600000,Dirección / lugar,2026-02-01,"lunes, viernes",3,También en sector 1,

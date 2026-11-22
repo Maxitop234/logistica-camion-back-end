@@ -48,3 +48,22 @@ function something()
 {
     // ..
 }
+
+/**
+ * Escribe un CSV temporal para las pruebas de importación (BE-04) y devuelve su ruta.
+ */
+function archivoCsvTemporal(string $contenido): string
+{
+    $ruta = tempnam(sys_get_temp_dir(), 'importacion_').'.csv';
+    file_put_contents($ruta, $contenido);
+
+    return $ruta;
+}
+
+/**
+ * Ruta de un CSV de prueba con datos inventados en `tests/Fixtures/importaciones/`.
+ */
+function fixtureDeImportacion(string $archivo): string
+{
+    return dirname(__DIR__).'/tests/Fixtures/importaciones/'.$archivo;
+}

@@ -1,0 +1,4 @@
+nombre,dias_recoleccion,periodicidad_semanal,puntos_esperados
+Sector Prueba Norte,2|4,2,3
+Sector Prueba Sur,"lunes, miércoles, viernes",3,2
+Sector Prueba Oriente,mar|jue,1,
