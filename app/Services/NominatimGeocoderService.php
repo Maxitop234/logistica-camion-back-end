@@ -13,6 +13,10 @@ class NominatimGeocoderService
 
     public const CACHE_KEY_PREFIX = 'nominatim:reverse:';
 
+    public const CACHE_KEY_PREFIX_BUSQUEDA = 'nominatim:search:';
+
+    public const CACHE_TTL_BUSQUEDA_SECONDS = 2_592_000;
+
     public const RATE_LIMIT_KEY = 'nominatim:global:next_slot_ms';
 
     public const RATE_LIMIT_LOCK_KEY = 'nominatim:global:slot_lock';
@@ -127,6 +131,74 @@ class NominatimGeocoderService
             'latitud' => $latRedondeada,
             'longitud' => $lonRedondeada,
         ];
+    }
+
+    /**
+     * Geocodificación directa (dirección → coordenadas) para la importación de
+     * puntos (BE-04), acotada a la zona de operación (`config('ecoruta.zona')`)
+     * y con la misma política de uso que `reverse()`: límite global de 1 req/s,
+     * User-Agent propio y caché de 30 días solo para los aciertos.
+     *
+     * @return array{latitud: float, longitud: float, desde_cache: bool}|null `null` si no hay resultado
+     */
+    public function buscar(string $consulta): ?array
+    {
+        $consulta = trim((string) preg_replace('/\s+/u', ' ', $consulta));
+        if ($consulta === '') {
+            return null;
+        }
+
+        $cacheKey = self::CACHE_KEY_PREFIX_BUSQUEDA.sha1(mb_strtolower($consulta));
+        /** @var array{latitud: float, longitud: float}|null $enCache */
+        $enCache = Cache::get($cacheKey);
+        if (is_array($enCache)) {
+            return [...$enCache, 'desde_cache' => true];
+        }
+
+        if (! $this->adquirirTurnoGlobal()['adquirido']) {
+            return null;
+        }
+
+        $baseUrl = rtrim((string) config('services.nominatim.base_url', 'https://nominatim.openstreetmap.org'), '/');
+        $userAgent = trim((string) config('services.nominatim.user_agent', 'EcoRutaTemuco/1.0 (contacto@ecoruta.cl)'));
+        $timeout = max(1, (int) config('services.nominatim.timeout', 5));
+
+        try {
+            $response = Http::timeout($timeout)
+                ->withHeaders([
+                    'User-Agent' => $userAgent !== '' ? $userAgent : 'EcoRutaTemuco/1.0 (contacto@ecoruta.cl)',
+                    'Accept' => 'application/json',
+                ])
+                ->get("{$baseUrl}/search", [
+                    'q' => $consulta,
+                    'format' => 'jsonv2',
+                    'limit' => 1,
+                    'countrycodes' => 'cl',
+                    'accept-language' => 'es',
+                    'viewbox' => implode(',', [
+                        config('ecoruta.zona.longitud_min'),
+                        config('ecoruta.zona.latitud_max'),
+                        config('ecoruta.zona.longitud_max'),
+                        config('ecoruta.zona.latitud_min'),
+                    ]),
+                    'bounded' => 1,
+                ]);
+        } catch (Throwable) {
+            return null;
+        }
+
+        $resultado = $response->successful() ? $response->json('0') : null;
+        if (! is_array($resultado) || ! is_numeric($resultado['lat'] ?? null) || ! is_numeric($resultado['lon'] ?? null)) {
+            return null;
+        }
+
+        $coordenadas = [
+            'latitud' => round((float) $resultado['lat'], 7),
+            'longitud' => round((float) $resultado['lon'], 7),
+        ];
+        Cache::put($cacheKey, $coordenadas, self::CACHE_TTL_BUSQUEDA_SECONDS);
+
+        return [...$coordenadas, 'desde_cache' => false];
     }
 
     /**
