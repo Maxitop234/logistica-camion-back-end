@@ -55,22 +55,42 @@ test('el detalle muestra lectura en vivo, bateria, senal e historial con validas
 });
 
 test('el estado de conexion distingue en linea, sin reportar, bateria baja, pendiente y desactivado', function () {
-    $mk = fn (array $a) => Dispositivo::factory()->create(['intervalo_lectura_seg' => 1800, ...$a]);
+    $mk = fn (array $a) => Dispositivo::factory()->create(['intervalo_lectura_seg' => 1800, 'ultima_lectura_en' => now()->subMinutes(1), ...$a]);
     $ok = $mk(['ultima_conexion_en' => now()->subMinutes(20), 'bateria_voltaje' => 3.9]);
     $limite = $mk(['ultima_conexion_en' => now()->subMinutes(59)]);
     $sin = $mk(['ultima_conexion_en' => now()->subMinutes(61)]);
     $baja = $mk(['ultima_conexion_en' => now()->subMinutes(5), 'bateria_voltaje' => 3.3]);
+    $espera = $mk(['ultima_conexion_en' => now()->subMinutes(3), 'ultima_lectura_en' => null]);
     $nuevo = $mk(['estado' => 'pendiente', 'punto_id' => null]);
     $off = $mk(['estado' => 'desactivado', 'ultima_conexion_en' => now()->subDays(3)]);
 
     expect($ok->estadoConexion())->toBe('en_linea')
         ->and($limite->estadoConexion())->toBe('en_linea')
         ->and($sin->estadoConexion())->toBe('sin_reportar')
+        ->and($espera->estadoConexion())->toBe('esperando_lectura')
         ->and($baja->estadoConexion())->toBe('bateria_baja')
         ->and($nuevo->estadoConexion())->toBe('pendiente')
         ->and($off->estadoConexion())->toBe('desactivado');
 
     $this->getJson('/api/v1/dispositivos?estado=pendiente')->assertOk()->assertJsonCount(1, 'data');
+});
+
+test('un sensor sin lecturas propias no hereda el llenado del punto y se muestra esperando lectura', function () {
+    $punto = Punto::factory()->create(['porcentaje_llenado' => 22, 'estado_llenado' => 'bajo']);
+    $d = Dispositivo::factory()->create(['punto_id' => $punto->id, 'ultima_conexion_en' => now()->subMinutes(3), 'ultima_lectura_en' => null]);
+
+    $this->getJson("/api/v1/dispositivos/{$d->id}")->assertOk()
+        ->assertJsonPath('data.estado_conexion', 'esperando_lectura')
+        ->assertJsonPath('data.sin_lecturas', true)
+        ->assertJsonPath('data.punto.porcentaje_llenado', null)
+        ->assertJsonPath('data.punto.estado_llenado', null);
+    expect($punto->fresh()->porcentaje_llenado)->toBe(22);
+
+    $d->update(['ultima_lectura_en' => now()]);
+    $this->getJson("/api/v1/dispositivos/{$d->id}")
+        ->assertJsonPath('data.estado_conexion', 'en_linea')
+        ->assertJsonPath('data.sin_lecturas', false)
+        ->assertJsonPath('data.punto.porcentaje_llenado', 22);
 });
 
 test('las alertas del panel cubren sin reportar, bateria baja, lecturas invalidas y sensores por vincular', function () {

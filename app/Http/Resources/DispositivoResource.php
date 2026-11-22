@@ -19,6 +19,8 @@ class DispositivoResource extends JsonResource
     public function toArray(Request $request): array
     {
         $punto = $this->punto;
+        // El llenado del punto puede venir de otra fuente: sin lecturas propias no se atribuye al sensor.
+        $sinLecturas = $this->resource->sinLecturas();
 
         return [
             'id' => $this->id,
@@ -29,9 +31,10 @@ class DispositivoResource extends JsonResource
                 'id' => $punto->id,
                 'nombre' => $punto->nombre,
                 'direccion' => $punto->direccion,
-                'porcentaje_llenado' => $punto->porcentaje_llenado,
-                'estado_llenado' => $punto->estado_llenado,
+                'porcentaje_llenado' => $sinLecturas ? null : $punto->porcentaje_llenado,
+                'estado_llenado' => $sinLecturas ? null : $punto->estado_llenado,
             ],
+            'sin_lecturas' => $sinLecturas,
             'tipo_sensor' => $this->tipo_sensor,
             'conectividad' => $this->conectividad,
             'firmware_version' => $this->firmware_version,

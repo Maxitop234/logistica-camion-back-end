@@ -224,6 +224,15 @@ class Dispositivo extends Model
     }
 
     /**
+     * Aún no ha enviado ninguna lectura propia (válida ni inválida); el anuncio y la
+     * consulta de estado solo cuentan como conexión.
+     */
+    public function sinLecturas(): bool
+    {
+        return $this->ultima_lectura_en === null;
+    }
+
+    /**
      * Más de N intervalos sin conexión (N = `iot.intervalos_sin_reporte`).
      */
     public function sinReportar(): bool
@@ -245,7 +254,7 @@ class Dispositivo extends Model
 
     /**
      * Estado que ve el administrador: pendiente, desactivado, sin_reportar,
-     * bateria_baja o en_linea.
+     * esperando_lectura, bateria_baja o en_linea.
      */
     public function estadoConexion(): string
     {
@@ -253,6 +262,7 @@ class Dispositivo extends Model
             $this->estado === self::ESTADO_PENDIENTE => 'pendiente',
             $this->estado === self::ESTADO_DESACTIVADO => 'desactivado',
             $this->sinReportar() => 'sin_reportar',
+            $this->sinLecturas() => 'esperando_lectura',
             $this->bateriaBaja() => 'bateria_baja',
             default => 'en_linea',
         };
