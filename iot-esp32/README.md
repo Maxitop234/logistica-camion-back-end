@@ -25,6 +25,21 @@ Proyecto PlatformIO, framework Arduino, placa `esp32dev`.
 
 Cada lectura espera hasta **90 s** a que el servidor gratuito (Render) despierte (tarda cerca de 1 min). `HTTPClient` acepta como máximo 65 s por intento, así que dentro de esos 90 s se reintenta ante un timeout o un 502/503/504 (hasta 3 intentos, con 3 s de pausa).
 
+## Estructura
+
+| Archivo (`src/`) | Responsabilidad |
+|---|---|
+| `main.cpp` | Ciclo: medir → encolar → conectar → enviar pendientes → apagar radio → dormir. Elige el transporte |
+| `medicion.*` | HC-SR04 (mediana) y batería (ADC) |
+| `lectura.*` | La lectura, su UUID v4 y su JSON (común a todos los transportes) |
+| `pendientes.*` | Cola en NVS; envía a través de la interfaz `Transporte` |
+| `sueno.*` | Deep sleep descontando la duración del ciclo |
+| `reloj.*` | Hora UTC del nodo (la pone en hora el transporte) |
+| `transporte.h` | Interfaz `Transporte`: `conectar()`, `enviar(lectura)`, `apagar()` y `ResultadoEnvio` |
+| `transporte_wifi_https.*` | Implementación actual: Wi-Fi, NTP y POST HTTPS con reintentos |
+
+**Agregar un transporte celular (pendiente):** crear `transporte_celular.h/.cpp` con una clase que herede de `Transporte` (`conectar()` enciende el módem, se registra en la red y pone la hora; `enviar()` hace el POST con `lecturaAJson` y traduce la respuesta a `ResultadoEnvio`; `apagar()` apaga el módem) y cambiar la instancia `transporte` en `main.cpp`. La medición, la cola y el sueño no cambian.
+
 ## Diagrama de pines
 
 ```
