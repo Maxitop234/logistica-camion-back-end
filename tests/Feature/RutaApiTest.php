@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\GpsTelemetryService;
 use App\Services\OsmRouteOptimizerService;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
@@ -297,6 +298,149 @@ test('la ruta parte de la ultima posicion GPS valida del chofer y si no hay de l
     $this->actingAs($this->adminUser, 'sanctum')
         ->postJson($url, $payload(now()->format('Y-m-d')))
         ->assertCreated();
+});
+
+/**
+ * Tres puntos al norponiente de la planta. Generada desde la planta (sin GPS del chofer
+ * y con OSRM caído), la ruta queda planificada en el orden C, B, A.
+ *
+ * @return array{ruta_id: int, a: Punto, b: Punto, c: Punto}
+ */
+function generarRutaParaOrdenarAlIniciar(object $t): array
+{
+    $a = Punto::factory()->lleno()->create(['nombre' => 'A', 'latitud' => -38.7305, 'longitud' => -72.6005]);
+    $b = Punto::factory()->lleno()->create(['nombre' => 'B', 'latitud' => -38.7350, 'longitud' => -72.6050]);
+    $c = Punto::factory()->lleno()->create(['nombre' => 'C', 'latitud' => -38.7450, 'longitud' => -72.6150]);
+
+    $respuesta = $t->actingAs($t->adminUser, 'sanctum')
+        ->postJson('/api/v1/rutas/generar', [
+            'camion_id' => $t->camion->id,
+            'chofer_id' => $t->chofer->id,
+            'fecha_programada' => now()->format('Y-m-d'),
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.paradas.0.punto.id', $c->id)
+        ->assertJsonPath('data.paradas.1.punto.id', $b->id)
+        ->assertJsonPath('data.paradas.2.punto.id', $a->id);
+
+    return ['ruta_id' => $respuesta->json('data.id'), 'a' => $a, 'b' => $b, 'c' => $c];
+}
+
+test('al iniciar, la ruta parte por la parada más cercana al chofer y sigue por cercanía', function () {
+    Http::fake(fn () => throw new ConnectionException('OSRM timeout'));
+    ['ruta_id' => $rutaId, 'a' => $a, 'b' => $b, 'c' => $c] = generarRutaParaOrdenarAlIniciar($this);
+    $estimadaAlGenerar = (float) Ruta::findOrFail($rutaId)->distancia_estimada_km;
+
+    // El chofer está junto a A: el orden planificado desde la planta (C, B, A) se invierte.
+    $respuesta = $this->actingAs($this->chofer->user, 'sanctum')
+        ->postJson("/api/v1/rutas/{$rutaId}/iniciar", ['latitud' => -38.7300, 'longitud' => -72.6000])
+        ->assertOk()
+        ->assertJsonPath('data.estado', Ruta::ESTADO_EN_CURSO)
+        ->assertJsonPath('data.paradas.0.punto.id', $a->id)
+        ->assertJsonPath('data.paradas.0.orden_parada', 1)
+        ->assertJsonPath('data.paradas.1.punto.id', $b->id)
+        ->assertJsonPath('data.paradas.2.punto.id', $c->id)
+        ->assertJsonPath('data.paradas.2.orden_parada', 3);
+
+    // El primer tramo es el corto del chofer a A, no el de la planta a C.
+    expect((float) $respuesta->json('data.paradas.0.distancia_tramo_km'))->toBeLessThan(0.2)
+        ->and((float) $respuesta->json('data.distancia_estimada_km'))->not->toBe($estimadaAlGenerar);
+
+    // El trazado parte en el chofer y termina en la planta.
+    $trazado = OsmRouteOptimizerService::decodificarPolilinea($respuesta->json('data.encoded_polyline'));
+    expect($trazado[0])->toBe([-38.73, -72.6])
+        ->and(end($trazado))->toBe([OsmRouteOptimizerService::PLANTA_LAT, OsmRouteOptimizerService::PLANTA_LNG]);
+
+    $log = AuditLog::where('accion', 'ruta_iniciada')->latest('id')->first();
+    expect($log->detalles['orden_desde'])->toBe('posicion_al_iniciar')
+        ->and($log->detalles['fuente_ruteo'])->toBe('local')
+        ->and($log->detalles)->not->toHaveKeys(['latitud', 'longitud']);
+});
+
+test('con OSRM la cercanía es por calles: lo cercano en línea recta pero sin paso directo queda al final', function () {
+    $chofer = [-38.7300, -72.6000];
+    $a = [-38.7305, -72.6005];
+
+    // Matriz por calles: distancia aproximada, salvo A, al otro lado del río (+10 km desde cualquier lado).
+    Http::fake(function (Request $peticion) use ($a) {
+        $url = $peticion->url();
+        if (str_contains($url, '/table/v1/driving/')) {
+            $coordenadas = array_map(
+                fn (string $par): array => array_map('floatval', array_reverse(explode(',', $par))),
+                explode(';', Str::before(Str::after($url, '/table/v1/driving/'), '?')),
+            );
+            $distancias = [];
+            foreach ($coordenadas as $i => $desde) {
+                foreach ($coordenadas as $j => $hasta) {
+                    $cruzaRio = ($desde === $a) !== ($hasta === $a);
+                    $distancias[$i][$j] = hypot($desde[0] - $hasta[0], $desde[1] - $hasta[1]) * 100000 + ($cruzaRio ? 10000 : 0);
+                }
+            }
+
+            return Http::response(['code' => 'Ok', 'distances' => $distancias]);
+        }
+        if (str_contains($url, '/route/v1/driving/')) {
+            return Http::response(['code' => 'Ok', 'routes' => [[
+                'geometry' => 'trazado_osrm',
+                'distance' => 15300.0,
+                'duration' => 1500.0,
+                'legs' => [
+                    ['distance' => 700.0, 'duration' => 120.0],
+                    ['distance' => 1600.0, 'duration' => 240.0],
+                    ['distance' => 11000.0, 'duration' => 900.0],
+                    ['distance' => 2000.0, 'duration' => 240.0],
+                ],
+            ]]]);
+        }
+
+        return Http::response([], 503);
+    });
+
+    ['ruta_id' => $rutaId, 'a' => $puntoA, 'b' => $b, 'c' => $c] = generarRutaParaOrdenarAlIniciar($this);
+
+    $this->actingAs($this->chofer->user, 'sanctum')
+        ->postJson("/api/v1/rutas/{$rutaId}/iniciar", ['latitud' => $chofer[0], 'longitud' => $chofer[1]])
+        ->assertOk()
+        ->assertJsonPath('data.paradas.0.punto.id', $b->id)
+        ->assertJsonPath('data.paradas.0.distancia_tramo_km', 0.7)
+        ->assertJsonPath('data.paradas.0.duracion_tramo_min', 2)
+        ->assertJsonPath('data.paradas.1.punto.id', $c->id)
+        ->assertJsonPath('data.paradas.2.punto.id', $puntoA->id)
+        ->assertJsonPath('data.paradas.2.distancia_tramo_km', 11)
+        ->assertJsonPath('data.encoded_polyline', 'trazado_osrm')
+        ->assertJsonPath('data.distancia_estimada_km', 15.3)
+        ->assertJsonPath('data.duracion_estimada_min', 25 + 3 * 4);
+
+    // El trazado se pide en el orden decidido: chofer → B → C → A → planta.
+    Http::assertSent(fn (Request $peticion): bool => str_contains(
+        $peticion->url(),
+        '/route/v1/driving/-72.600000,-38.730000;-72.605000,-38.735000;-72.615000,-38.745000;-72.600500,-38.730500;-72.586500,-38.765500',
+    ));
+
+    expect(AuditLog::where('accion', 'ruta_iniciada')->latest('id')->first()->detalles['fuente_ruteo'])->toBe('osrm');
+});
+
+test('sin posición al iniciar ordena desde la última posición conocida o la planta y valida las coordenadas', function () {
+    Http::fake(['router.project-osrm.org/*' => Http::response([], 503)]);
+    ['ruta_id' => $rutaId, 'c' => $c] = generarRutaParaOrdenarAlIniciar($this);
+
+    $this->actingAs($this->chofer->user, 'sanctum')
+        ->postJson("/api/v1/rutas/{$rutaId}/iniciar", ['latitud' => -38.73])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('longitud');
+    $this->actingAs($this->chofer->user, 'sanctum')
+        ->postJson("/api/v1/rutas/{$rutaId}/iniciar", ['latitud' => -138.73, 'longitud' => -72.6])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('latitud');
+    expect(Ruta::findOrFail($rutaId)->estado)->toBe(Ruta::ESTADO_PLANIFICADA);
+
+    // Sin GPS reciente del chofer, la parada más cercana a la planta va primero.
+    $this->actingAs($this->chofer->user, 'sanctum')
+        ->postJson("/api/v1/rutas/{$rutaId}/iniciar")
+        ->assertOk()
+        ->assertJsonPath('data.paradas.0.punto.id', $c->id);
+
+    expect(AuditLog::where('accion', 'ruta_iniciada')->latest('id')->first()->detalles['orden_desde'])->toBe('planta');
 });
 
 function generarRutaParaCancelar(object $t): int

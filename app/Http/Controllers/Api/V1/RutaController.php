@@ -263,14 +263,27 @@ class RutaController extends Controller
     }
 
     /**
-     * Inicia una ruta planificada del chofer autenticado.
+     * Inicia una ruta planificada del chofer autenticado. El orden de visita se
+     * decide en este momento: primero la parada más cercana al chofer y luego por
+     * cercanía (ver `OsmRouteOptimizerService::ordenarPorCercania`). La posición
+     * es la que envía la app al iniciar o, si no la envía, la última posición GPS
+     * válida del chofer y, en último caso, la planta.
      */
-    public function iniciar(Request $request, Ruta $ruta): RutaResource|JsonResponse
-    {
+    public function iniciar(
+        Request $request,
+        Ruta $ruta,
+        OsmRouteOptimizerService $optimizer,
+        GpsTelemetryService $gpsService,
+    ): RutaResource|JsonResponse {
         $chofer = $request->user()?->chofer()->first();
         if (! $chofer instanceof Chofer || $ruta->chofer_id !== $chofer->id) {
             return response()->json(['message' => 'No tienes permiso para iniciar esta ruta.'], 403);
         }
+
+        $datos = $request->validate([
+            'latitud' => ['nullable', 'required_with:longitud', 'numeric', 'between:-90,90'],
+            'longitud' => ['nullable', 'required_with:latitud', 'numeric', 'between:-180,180'],
+        ]);
 
         if ($ruta->estado !== Ruta::ESTADO_PLANIFICADA) {
             return response()->json(['message' => 'Solo se pueden iniciar rutas en estado planificada.'], 422);
@@ -280,19 +293,67 @@ class RutaController extends Controller
             return response()->json(['message' => 'El camión de esta ruta no está disponible. Avisa al administrador.'], 422);
         }
 
-        DB::transaction(function () use ($ruta, $request): void {
-            $ruta->update([
+        if (isset($datos['latitud'], $datos['longitud'])) {
+            [$origenLat, $origenLng] = [(float) $datos['latitud'], (float) $datos['longitud']];
+            $origen = 'posicion_al_iniciar';
+        } else {
+            [$origenLat, $origenLng] = $gpsService->origenParaChofer($chofer);
+            $origen = [$origenLat, $origenLng] === [OsmRouteOptimizerService::PLANTA_LAT, OsmRouteOptimizerService::PLANTA_LNG]
+                ? 'planta'
+                : 'ultima_posicion_gps';
+        }
+
+        // Fuera de la transacción: OSRM puede tardar y no debe retener bloqueos.
+        $paradas = $ruta->paradas()->with('punto')->get()->keyBy('punto_id');
+        $ordenamiento = $optimizer->ordenarPorCercania(
+            $paradas->map(fn (RutaPunto $p): Punto => $p->punto)->values(),
+            $origenLat,
+            $origenLng,
+            now(),
+        );
+
+        $iniciada = DB::transaction(function () use ($ruta, $request, $paradas, $ordenamiento, $origen): bool {
+            $bloqueada = Ruta::whereKey($ruta->id)->lockForUpdate()->first();
+            if (! $bloqueada instanceof Ruta || $bloqueada->estado !== Ruta::ESTADO_PLANIFICADA) {
+                return false;
+            }
+
+            // Dos pasadas: la restricción única (ruta_id, orden_parada) no permite intercambiar órdenes en una.
+            // La segunda va por consulta y no por el modelo, que no sabe del cambio de signo y omitiría
+            // las paradas que conservan su número.
+            $bloqueada->paradas()->update(['orden_parada' => DB::raw('-orden_parada')]);
+            foreach ($ordenamiento['paradas'] as $nueva) {
+                RutaPunto::whereKey($paradas[$nueva['punto']->id]->id)->update([
+                    'orden_parada' => $nueva['orden'],
+                    'distancia_tramo_km' => $nueva['distancia_tramo_km'],
+                    'duracion_tramo_min' => $nueva['duracion_tramo_min'],
+                    'hora_estimada_llegada' => $nueva['hora_estimada_llegada'],
+                ]);
+            }
+
+            $bloqueada->update([
                 'estado' => Ruta::ESTADO_EN_CURSO,
                 'hora_inicio_real' => now(),
+                'distancia_estimada_km' => $ordenamiento['distancia_km'],
+                'duracion_estimada_min' => $ordenamiento['duracion_min'],
+                'encoded_polyline' => $ordenamiento['encoded_polyline'],
             ]);
 
-            $ruta->camion()->update(['estado_operativo' => 'en_ruta']);
+            $bloqueada->camion()->update(['estado_operativo' => 'en_ruta']);
 
             AuditLog::registrar('ruta_iniciada', $request->user(), $request, [
-                'ruta_id' => $ruta->id,
-                'camion_id' => $ruta->camion_id,
+                'ruta_id' => $bloqueada->id,
+                'camion_id' => $bloqueada->camion_id,
+                'orden_desde' => $origen,
+                'fuente_ruteo' => $ordenamiento['fuente'],
             ]);
+
+            return true;
         });
+
+        if (! $iniciada) {
+            return response()->json(['message' => 'Solo se pueden iniciar rutas en estado planificada.'], 422);
+        }
 
         return new RutaResource($ruta->fresh()->load(self::RELACIONES));
     }
