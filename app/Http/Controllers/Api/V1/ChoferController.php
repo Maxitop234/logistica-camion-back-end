@@ -31,6 +31,7 @@ class ChoferController extends Controller
     private const RELACIONES = [
         'user',
         'camionActual',
+        'rutaActiva',
         ...LicenciaChoferController::RELACIONES_LICENCIA,
         'ultimaSolicitudReactivacion.resueltaPor.administrador',
     ];

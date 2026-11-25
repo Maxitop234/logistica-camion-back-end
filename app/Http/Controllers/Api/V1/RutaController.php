@@ -99,14 +99,19 @@ class RutaController extends Controller
             ], 422);
         }
 
-        $yaTieneRuta = Ruta::where('chofer_id', $chofer->id)
-            ->whereDate('fecha_programada', $datos['fecha_programada'])
-            ->whereIn('estado', [Ruta::ESTADO_PLANIFICADA, Ruta::ESTADO_EN_CURSO])
-            ->exists();
-
-        if ($yaTieneRuta) {
+        // Una ruta planificada o en curso (de cualquier fecha) ocupa al chofer y al camión: el
+        // chofer solo ve una ruta activa a la vez.
+        $rutaDelChofer = Ruta::where('chofer_id', $chofer->id)->whereIn('estado', Ruta::ESTADOS_ACTIVOS)->latest('id')->first();
+        if ($rutaDelChofer instanceof Ruta) {
             return response()->json([
-                'message' => 'Este chofer ya tiene una ruta planificada o en curso para la fecha seleccionada.',
+                'message' => "Este chofer ya tiene la ruta #{$rutaDelChofer->id} ".self::estadoLegible($rutaDelChofer).'. Cancélala o finalízala antes de generar otra.',
+            ], 422);
+        }
+
+        $rutaDelCamion = Ruta::where('camion_id', $camion->id)->whereIn('estado', Ruta::ESTADOS_ACTIVOS)->latest('id')->first();
+        if ($rutaDelCamion instanceof Ruta) {
+            return response()->json([
+                'message' => "El camión ya tiene la ruta #{$rutaDelCamion->id} ".self::estadoLegible($rutaDelCamion).'. Cancélala o finalízala antes de generar otra.',
             ], 422);
         }
 
@@ -171,6 +176,11 @@ class RutaController extends Controller
         return (new RutaResource($ruta->load(self::RELACIONES)))
             ->response()
             ->setStatusCode(201);
+    }
+
+    private static function estadoLegible(Ruta $ruta): string
+    {
+        return $ruta->estado === Ruta::ESTADO_EN_CURSO ? 'en curso' : 'planificada';
     }
 
     /**

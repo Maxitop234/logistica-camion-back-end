@@ -32,6 +32,11 @@ class CamionResource extends JsonResource
                 'id' => $this->choferActual->id,
                 'nombre' => $this->choferActual->nombre_cifrado,
             ] : null),
+            'ruta_activa' => $this->whenLoaded('rutaActiva', fn () => $this->rutaActiva ? [
+                'id' => $this->rutaActiva->id,
+                'estado' => $this->rutaActiva->estado,
+                'fecha_programada' => $this->rutaActiva->fecha_programada->toDateString(),
+            ] : null),
             'ultima_posicion' => [
                 'latitud' => $this->ultima_latitud,
                 'longitud' => $this->ultima_longitud,

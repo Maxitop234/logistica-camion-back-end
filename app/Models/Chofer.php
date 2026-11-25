@@ -222,6 +222,19 @@ class Chofer extends Model
     }
 
     /**
+     * Ruta planificada o en curso que bloquea al chofer (la más reciente; prioriza en curso).
+     *
+     * @return HasOne<Ruta, $this>
+     */
+    public function rutaActiva(): HasOne
+    {
+        return $this->hasOne(Ruta::class)->ofMany(
+            ['id' => 'max'],
+            fn ($query) => $query->whereIn('estado', Ruta::ESTADOS_ACTIVOS),
+        );
+    }
+
+    /**
      * @return BelongsTo<User, $this>
      */
     public function licenciaVerificadaPor(): BelongsTo

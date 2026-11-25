@@ -62,6 +62,13 @@ class Ruta extends Model
     public const ESTADO_CANCELADA = 'cancelada';
 
     /**
+     * Estados que mantienen ocupados al chofer y al camión de la ruta.
+     *
+     * @var array<int, string>
+     */
+    public const ESTADOS_ACTIVOS = [self::ESTADO_PLANIFICADA, self::ESTADO_EN_CURSO];
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array

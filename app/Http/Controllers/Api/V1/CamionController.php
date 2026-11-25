@@ -18,19 +18,19 @@ class CamionController extends Controller
 {
     public function index(): AnonymousResourceCollection
     {
-        return CamionResource::collection(Camion::with('choferActual')->orderBy('patente')->get());
+        return CamionResource::collection(Camion::with(['choferActual', 'rutaActiva'])->orderBy('patente')->get());
     }
 
     public function store(StoreCamionRequest $request): JsonResponse
     {
         $camion = Camion::create($request->validated());
 
-        return (new CamionResource($camion->refresh()->load('choferActual')))->response()->setStatusCode(201);
+        return (new CamionResource($camion->refresh()->load(['choferActual', 'rutaActiva'])))->response()->setStatusCode(201);
     }
 
     public function show(Camion $camion): CamionResource
     {
-        return new CamionResource($camion->load('choferActual'));
+        return new CamionResource($camion->load(['choferActual', 'rutaActiva']));
     }
 
     public function update(UpdateCamionRequest $request, Camion $camion): CamionResource|JsonResponse
@@ -62,7 +62,7 @@ class CamionController extends Controller
             }
         });
 
-        return new CamionResource($camion->fresh()->load('choferActual'));
+        return new CamionResource($camion->fresh()->load(['choferActual', 'rutaActiva']));
     }
 
     /**

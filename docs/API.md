@@ -134,6 +134,7 @@ Comandos (solo con acceso al servidor): `php artisan ecoruta:restablecer-admin {
   "id": 3, "patente": "CC3333", "marca": "Mercedes-Benz", "modelo": "Atego", "anio": 2022,
   "capacidad_kg": "10000.00", "estado_operativo": "disponible",
   "chofer_actual": { "id": 3, "nombre": "Luis Ejemplo Muñoz" },
+  "ruta_activa": null,
   "ultima_posicion": { "latitud": null, "longitud": null, "velocidad_kmh": "0.00", "actualizada_en": null }
 }
 ```
@@ -154,7 +155,8 @@ Comandos (solo con acceso al servidor): `php artisan ecoruta:restablecer-admin {
 {
   "id": 1, "user_id": 2, "email": "chofer1@ecoruta.test", "is_active": true,
   "nombre": "Pedro Ejemplo Soto", "telefono": "+56922222220", "licencia_clase": "A4",
-  "disponible": true, "camion_actual": { "id": 1, "patente": "AA1111" }
+  "disponible": true, "camion_actual": { "id": 1, "patente": "AA1111" },
+  "ruta_activa": { "id": 55, "estado": "en_curso", "fecha_programada": "2026-11-19" }
 }
 ```
 
@@ -401,7 +403,7 @@ Con una lectura inválida: `201` con `valida: false`, `motivo_invalido` y `lectu
 
 | Acción | Cuerpo | Reglas |
 |---|---|---|
-| `POST /rutas/generar` | `{camion_id, chofer_id, fecha_programada, sector_ids?: [..], incluir_punto_ids?: [..], excluir_punto_ids?: [..], origen?: {latitud, longitud}, destino?}` | Sin `sector_ids`, usa los sectores del día que aún no están en otra ruta de esa fecha (hay dos camiones por día). Inclusión según [ADR-0013](ADR/0013-estado-de-puntos-sin-sensor.md): estado vigente alto o lleno, o estado desconocido (calendario); los ajustes manuales del administrador quedan registrados. Sin `origen`, parte de la última posición GPS válida del chofer (precisión ≤ 50 m, últimas 24 h) y, si no hay, de la planta (`PLANTA_*`). Responde `422` si el camión tiene otro chofer asignado o el chofer tiene otro camión. Licencia verificada y vigente (BE-12). Una ruta activa por camión y fecha. `201` en ≤ 2 min |
+| `POST /rutas/generar` | `{camion_id, chofer_id, fecha_programada, sector_ids?: [..], incluir_punto_ids?: [..], excluir_punto_ids?: [..], origen?: {latitud, longitud}, destino?}` | Sin `sector_ids`, usa los sectores del día que aún no están en otra ruta de esa fecha (hay dos camiones por día). Inclusión según [ADR-0013](ADR/0013-estado-de-puntos-sin-sensor.md): estado vigente alto o lleno, o estado desconocido (calendario); los ajustes manuales del administrador quedan registrados. Sin `origen`, parte de la última posición GPS válida del chofer (precisión ≤ 50 m, últimas 24 h) y, si no hay, de la planta (`PLANTA_*`). Responde `422` si el camión tiene otro chofer asignado o el chofer tiene otro camión. Licencia verificada y vigente (BE-12). `422` si el chofer o el camión ya tienen una ruta `planificada` o `en_curso` de cualquier fecha (el mensaje indica su número). `201` en ≤ 2 min |
 | `GET /rutas` | `?fecha_programada=AAAA-MM-DD&estado=&chofer_id=&camion_id=&limite=` (`estado` admite varios separados por coma, p. ej. `planificada,en_curso`; `limite` 1–500) | `{data: Ruta[]}` con `paradas`, de la más reciente a la más antigua |
 | `GET /chofer/ruta-activa` | — | `{data: Ruta}` del día para el chofer autenticado; `{data: null}` si no tiene |
 | `POST /rutas/{id}/iniciar` | `{latitud?, longitud?}` (posición del chofer al iniciar; van juntas) | `planificada → en_curso`, `hora_inicio_real`, camión `en_ruta`. El orden de visita se decide aquí: primero la parada más cercana al chofer y luego, desde cada parada, la siguiente más cercana, con regreso a la planta (distancia por calles de OSRM `/table` y trazado `/route`; sin OSRM, línea recta). Sin posición, parte de la última posición GPS válida del chofer y, si no hay, de la planta. Recalcula `orden_parada`, tramos, horas estimadas, `distancia_estimada_km`, `duracion_estimada_min` y `encoded_polyline`; auditoría `ruta_iniciada` con `orden_desde` y `fuente_ruteo` (sin coordenadas). `422` si el estado no corresponde |

@@ -37,6 +37,11 @@ class ChoferResource extends JsonResource
                 'id' => $this->camionActual->id,
                 'patente' => $this->camionActual->patente,
             ] : null),
+            'ruta_activa' => $this->whenLoaded('rutaActiva', fn () => $this->rutaActiva ? [
+                'id' => $this->rutaActiva->id,
+                'estado' => $this->rutaActiva->estado,
+                'fecha_programada' => $this->rutaActiva->fecha_programada->toDateString(),
+            ] : null),
             'licencia' => LicenciaChoferResource::resumen($this->resource),
             'avatar' => $this->resource->avatarResuelto(),
         ];

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -69,6 +70,19 @@ class Camion extends Model
     public function choferActual(): BelongsTo
     {
         return $this->belongsTo(Chofer::class, 'chofer_actual_id');
+    }
+
+    /**
+     * Ruta planificada o en curso que bloquea al camión (la más reciente).
+     *
+     * @return HasOne<Ruta, $this>
+     */
+    public function rutaActiva(): HasOne
+    {
+        return $this->hasOne(Ruta::class)->ofMany(
+            ['id' => 'max'],
+            fn ($query) => $query->whereIn('estado', Ruta::ESTADOS_ACTIVOS),
+        );
     }
 
     /**
