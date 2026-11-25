@@ -146,8 +146,13 @@ class OsmRouteOptimizerService
         }
 
         ksort($ordenados);
+        $secuencia = array_values($ordenados);
 
-        return $this->resultadoOsrm(array_values($ordenados), $trips[0], $salida);
+        // `/trip` solo decide el orden: no acepta `continue_straight` y su trazado da
+        // media vuelta en las paradas. El trazado sale de `/route`, que sí lo respeta;
+        // si esa segunda consulta falla se conserva el del viaje.
+        return $this->rutaOsrm($secuencia, $origenLat, $origenLng, $salida, $origenLat, $origenLng)
+            ?? $this->resultadoOsrm($secuencia, $trips[0], $salida);
     }
 
     /**
@@ -186,21 +191,31 @@ class OsmRouteOptimizerService
     }
 
     /**
-     * Trazado por calles de OSRM para un orden ya decidido: origen → paradas → planta.
+     * Trazado por calles de OSRM para un orden ya decidido: origen → paradas →
+     * destino (por defecto la planta). Con `continue_straight` el camión no da
+     * media vuelta en una parada: sigue y rodea la manzana respetando el sentido
+     * de las calles.
      *
      * @param  array<int, Punto>  $secuencia
      * @return Optimizacion|null
      */
-    private function rutaOsrm(array $secuencia, float $origenLat, float $origenLng, CarbonInterface $salida): ?array
-    {
+    private function rutaOsrm(
+        array $secuencia,
+        float $origenLat,
+        float $origenLng,
+        CarbonInterface $salida,
+        float $destinoLat = self::PLANTA_LAT,
+        float $destinoLng = self::PLANTA_LNG,
+    ): ?array {
         $json = $this->consultarOsrm('route', [
             [$origenLat, $origenLng],
             ...self::coordenadas($secuencia),
-            [self::PLANTA_LAT, self::PLANTA_LNG],
+            [$destinoLat, $destinoLng],
         ], [
             'overview' => 'full',
             'geometries' => 'polyline',
             'steps' => 'false',
+            'continue_straight' => 'true',
         ]);
 
         $rutas = $json['routes'] ?? null;

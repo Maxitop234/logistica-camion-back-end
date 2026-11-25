@@ -39,9 +39,31 @@ test('genera una ruta optimizada con OSRM, filtra puntos alto/lleno y la entrega
         [OsmRouteOptimizerService::PLANTA_LAT, OsmRouteOptimizerService::PLANTA_LNG],
     ]);
 
+    $trazadoSinMediaVuelta = OsmRouteOptimizerService::codificarPolilinea([
+        [OsmRouteOptimizerService::PLANTA_LAT, OsmRouteOptimizerService::PLANTA_LNG],
+        [-38.7330, -72.6100],
+        [-38.7300, -72.6080],
+        [-38.7180, -72.6050],
+        [OsmRouteOptimizerService::PLANTA_LAT, OsmRouteOptimizerService::PLANTA_LNG],
+    ]);
+
     // OSRM invierte el orden: visita primero p2 (índice 2 -> waypoint_index 1) y luego p1 (índice 1 -> waypoint_index 2).
+    // El trazado final sale de `/route` (sin media vuelta en las paradas).
     Http::fake([
-        'router.project-osrm.org/*' => Http::response([
+        'router.project-osrm.org/route/*' => Http::response([
+            'code' => 'Ok',
+            'routes' => [[
+                'geometry' => $trazadoSinMediaVuelta,
+                'distance' => 12850.0,
+                'duration' => 1380.0,
+                'legs' => [
+                    ['distance' => 4200.0, 'duration' => 480.0],
+                    ['distance' => 3500.0, 'duration' => 420.0],
+                    ['distance' => 5150.0, 'duration' => 480.0],
+                ],
+            ]],
+        ], 200),
+        'router.project-osrm.org/trip/*' => Http::response([
             'code' => 'Ok',
             'waypoints' => [
                 ['waypoint_index' => 0],
@@ -81,12 +103,21 @@ test('genera una ruta optimizada con OSRM, filtra puntos alto/lleno y la entrega
         ->assertJsonPath('data.total_puntos_evaluados', 4)
         ->assertJsonPath('data.puntos_incluidos_count', 2)
         ->assertJsonPath('data.puntos_excluidos_count', 2)
-        ->assertJsonPath('data.encoded_polyline', $polilineaOsrm)
+        ->assertJsonPath('data.encoded_polyline', $trazadoSinMediaVuelta)
+        ->assertJsonPath('data.distancia_estimada_km', 12.85)
         ->assertJsonPath('data.paradas.0.punto.id', $p2->id)
         ->assertJsonPath('data.paradas.0.distancia_tramo_km', 4.2)
         ->assertJsonPath('data.paradas.0.duracion_tramo_min', 8)
         ->assertJsonPath('data.paradas.1.punto.id', $p1->id)
-        ->assertJsonPath('data.paradas.1.distancia_tramo_km', 3.1);
+        ->assertJsonPath('data.paradas.1.distancia_tramo_km', 3.5);
+
+    // `/trip` rechaza continue_straight; `/route` lo recibe con el orden del viaje y vuelve al origen.
+    Http::assertSent(fn (Request $peticion): bool => str_contains($peticion->url(), '/trip/v1/driving/')
+        && ! str_contains($peticion->url(), 'continue_straight'));
+    Http::assertSent(fn (Request $peticion): bool => str_contains(
+        $peticion->url(),
+        '/route/v1/driving/-72.586500,-38.765500;-72.610000,-38.733000;-72.605000,-38.718000;-72.586500,-38.765500',
+    ) && str_contains($peticion->url(), 'continue_straight=true'));
 
     expect(AuditLog::where('accion', 'route_generated')->where('user_id', $this->adminUser->id)->exists())->toBeTrue();
 
@@ -109,6 +140,42 @@ test('genera una ruta optimizada con OSRM, filtra puntos alto/lleno y la entrega
         ->getJson("/api/v1/rutas?fecha_programada={$hoy}")
         ->assertOk()
         ->assertJsonCount(1, 'data');
+});
+
+test('si /route falla tras /trip conserva el orden y el trazado del viaje', function () {
+    $p1 = Punto::factory()->lleno()->create(['latitud' => -38.7180, 'longitud' => -72.6050]);
+    $p2 = Punto::factory()->lleno()->create(['latitud' => -38.7330, 'longitud' => -72.6100]);
+
+    Http::fake([
+        'router.project-osrm.org/route/*' => Http::response([], 503),
+        'router.project-osrm.org/trip/*' => Http::response([
+            'code' => 'Ok',
+            'waypoints' => [['waypoint_index' => 0], ['waypoint_index' => 2], ['waypoint_index' => 1]],
+            'trips' => [[
+                'geometry' => 'trazado_del_viaje',
+                'distance' => 12450.0,
+                'duration' => 1320.0,
+                'legs' => [
+                    ['distance' => 4200.0, 'duration' => 480.0],
+                    ['distance' => 3100.0, 'duration' => 360.0],
+                    ['distance' => 5150.0, 'duration' => 480.0],
+                ],
+            ]],
+        ], 200),
+    ]);
+
+    $this->actingAs($this->adminUser, 'sanctum')
+        ->postJson('/api/v1/rutas/generar', [
+            'camion_id' => $this->camion->id,
+            'chofer_id' => $this->chofer->id,
+            'fecha_programada' => now()->format('Y-m-d'),
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.encoded_polyline', 'trazado_del_viaje')
+        ->assertJsonPath('data.paradas.0.punto.id', $p2->id)
+        ->assertJsonPath('data.paradas.1.punto.id', $p1->id);
+
+    expect(AuditLog::where('accion', 'route_generated')->latest('id')->first()->detalles['fuente_ruteo'])->toBe('osrm');
 });
 
 test('si OSRM falla o hace timeout aplica respaldo local automatico sin trabar el despacho', function () {
@@ -415,7 +482,7 @@ test('con OSRM la cercanía es por calles: lo cercano en línea recta pero sin p
     Http::assertSent(fn (Request $peticion): bool => str_contains(
         $peticion->url(),
         '/route/v1/driving/-72.600000,-38.730000;-72.605000,-38.735000;-72.615000,-38.745000;-72.600500,-38.730500;-72.586500,-38.765500',
-    ));
+    ) && str_contains($peticion->url(), 'continue_straight=true'));
 
     expect(AuditLog::where('accion', 'ruta_iniciada')->latest('id')->first()->detalles['fuente_ruteo'])->toBe('osrm');
 });

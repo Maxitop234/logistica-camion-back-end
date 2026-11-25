@@ -98,7 +98,9 @@ sequenceDiagram
     API->>API: Incluye alto/lleno vigentes y desconocidos (calendario, ADR-0013); excluye vigentes vacío/bajo/medio
     API->>R: /trip (planta → puntos listos → planta)
     alt OSRM responde
-        R-->>API: orden óptimo, duración y distancia por tramo, geometría
+        R-->>API: orden óptimo
+        API->>R: /route en ese orden con continue_straight=true (sin media vuelta en las paradas)
+        R-->>API: duración y distancia por tramo, geometría (si falla, las del /trip)
     else falla o timeout
         API->>DB: orden por vecino más cercano (ST_Distance)
         Note over API: modo_calculo = "proximidad"
