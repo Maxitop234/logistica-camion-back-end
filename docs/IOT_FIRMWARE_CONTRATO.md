@@ -1,6 +1,6 @@
 # Contrato del firmware ESP32
 
-Lo que debe hacer el firmware del nodo sensor (ESP32 + HC-SR04 o JSN-SR04T) para hablar con la API. No hay firmware aún: cuando exista, solo sigue este documento. Referencias: `docs/API.md` §4.3 y §4.4, ADR-0007 y ADR-0012. Los valores de zona ciega, alcance y consumo son de las hojas de datos y están **POR CONFIRMAR** con el hardware definitivo.
+Lo que debe hacer el firmware del nodo sensor (ESP32 + HC-SR04 o JSN-SR04T) para hablar con la API. La primera versión está en `iot-esp32/` (HC-SR04, token fijo en `secrets.h` e intervalo propio; ver sus diferencias con este contrato en `iot-esp32/README.md`). Referencias: `docs/API.md` §4.3 y §4.4, ADR-0007 y ADR-0012. Los valores de zona ciega, alcance y consumo son de las hojas de datos y están **POR CONFIRMAR** con el hardware definitivo.
 
 Todo va por HTTPS con `Content-Type: application/json`. Las fechas son ISO 8601 en UTC. `{BASE}` es la URL de la API (`https://…/api/v1`).
 

@@ -6,7 +6,7 @@ La sección del proyecto (esta) manda sobre las guías genéricas de Laravel Boo
 ## 1. Contexto en 30 segundos
 
 - **Qué es:** API REST (`/api/v1`) de EcoRuta Temuco para Somos Terranova. Genera rutas de recolección según el llenado real de los puntos de reciclaje, rastrea la flota por GPS del teléfono del chofer y calcula KPI con metas.
-- **Clientes:** app Flutter (web para `administrador`, móvil para `chofer`) en el repo hermano `../logistica_camion_front_end`, y nodos sensores ESP32 (firmware en `iot-esp32/`, pendiente).
+- **Clientes:** app Flutter (web para `administrador`, móvil para `chofer`) en el repo hermano `../logistica_camion_front_end`, y nodos sensores ESP32 (firmware en `iot-esp32/`, primera versión sin probar con hardware).
 - **Stack:** Laravel 13 · PHP 8.5 (Sail) · PostgreSQL 18 + PostGIS 3.6 · Sanctum (tokens Bearer) · Pest · Pint · Larastan.
 - **Plazo:** entrega final el 11-12-2026, con una demo del sistema funcionando. **Regla de oro: nada de datos simulados en la demo.**
 
