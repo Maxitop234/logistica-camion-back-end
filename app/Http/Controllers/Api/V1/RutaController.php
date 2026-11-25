@@ -31,7 +31,8 @@ class RutaController extends Controller
     private const RELACIONES = ['camion', 'chofer', 'paradas.punto'];
 
     /**
-     * Lista rutas filtrables por fecha, estado, chofer o camión (administrador).
+     * Lista rutas filtrables por fecha, estado (uno o varios separados por coma), chofer o
+     * camión (administrador), de la más reciente a la más antigua; `limite` acota la cantidad.
      */
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -40,6 +41,7 @@ class RutaController extends Controller
             'estado' => ['nullable', 'string', 'max:30'],
             'chofer_id' => ['nullable', 'integer'],
             'camion_id' => ['nullable', 'integer'],
+            'limite' => ['nullable', 'integer', 'min:1', 'max:500'],
         ]);
 
         $query = Ruta::with(self::RELACIONES)->orderByDesc('fecha_programada')->orderByDesc('id');
@@ -48,13 +50,17 @@ class RutaController extends Controller
             $query->whereDate('fecha_programada', $request->query('fecha_programada'));
         }
         if (is_string($request->query('estado')) && $request->query('estado') !== '') {
-            $query->where('estado', $request->query('estado'));
+            $query->whereIn('estado', explode(',', $request->query('estado')));
         }
         if ($request->filled('chofer_id')) {
             $query->where('chofer_id', (int) $request->query('chofer_id'));
         }
         if ($request->filled('camion_id')) {
             $query->where('camion_id', (int) $request->query('camion_id'));
+        }
+
+        if ($request->filled('limite')) {
+            $query->limit((int) $request->query('limite'));
         }
 
         return RutaResource::collection($query->get());
