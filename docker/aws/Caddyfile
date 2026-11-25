@@ -1,0 +1,32 @@
+# Caddy obtiene y renueva solo los certificados TLS (Let's Encrypt, con ZeroSSL de respaldo).
+# API_HOST y PANEL_HOST llegan desde /opt/ecoruta/.env (p. ej. api.3-91-12-34.sslip.io).
+
+(seguridad) {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}
+
+{$API_HOST} {
+	import seguridad
+	encode zstd gzip
+	reverse_proxy api:10000
+}
+
+{$PANEL_HOST} {
+	import seguridad
+	header X-Frame-Options "DENY"
+	encode zstd gzip
+	root * /srv/panel
+
+	# Igual que web/_headers en Netlify: el navegador no se queda con un build viejo.
+	@sin_cache path / /index.html /main.dart.js /flutter_bootstrap.js /flutter_service_worker.js /version.json
+	header @sin_cache Cache-Control "no-cache"
+
+	# Fallback de la SPA (go_router), igual que web/_redirects.
+	try_files {path} /index.html
+	file_server
+}

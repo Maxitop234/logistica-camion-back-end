@@ -1,0 +1,63 @@
+# Demo de EcoRuta en una EC2 del Learner Lab (lo sube ecoruta-aws.sh a /opt/ecoruta).
+#   caddy (HTTPS automático + panel web) → api (Laravel, Dockerfile de la raíz) → db (PostGIS)
+# Las variables salen de /opt/ecoruta/.env, generado por el script; ningún secreto vive aquí.
+# Al reiniciar el lab la EC2 vuelve a arrancar y restart: unless-stopped levanta todo solo.
+name: ecoruta
+
+services:
+    db:
+        image: postgis/postgis:18-3.6-alpine
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: ${DB_DATABASE}
+            POSTGRES_USER: ${DB_USERNAME}
+            POSTGRES_PASSWORD: ${DB_PASSWORD}
+        volumes:
+            - db-data:/var/lib/postgresql
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -q -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+            interval: 5s
+            timeout: 5s
+            retries: 30
+
+    api:
+        build: ./api
+        image: ecoruta-api:latest
+        restart: unless-stopped
+        env_file: .env
+        depends_on:
+            db:
+                condition: service_healthy
+        volumes:
+            # Licencias y demás archivos subidos sobreviven a los redespliegues.
+            - api-storage:/var/www/html/storage/app
+        healthcheck:
+            test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1:10000/up') === false ? 1 : 0);"]
+            interval: 10s
+            timeout: 5s
+            retries: 12
+            start_period: 30s
+
+    caddy:
+        image: caddy:2-alpine
+        restart: unless-stopped
+        depends_on:
+            - api
+        ports:
+            - "80:80"
+            - "443:443"
+            - "443:443/udp"
+        environment:
+            API_HOST: ${API_HOST}
+            PANEL_HOST: ${PANEL_HOST}
+        volumes:
+            - ./Caddyfile:/etc/caddy/Caddyfile:ro
+            - ./panel:/srv/panel:ro
+            - caddy-data:/data
+            - caddy-config:/config
+
+volumes:
+    db-data:
+    api-storage:
+    caddy-data:
+    caddy-config:
